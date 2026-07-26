@@ -4,8 +4,8 @@
 FROM node:22-alpine
 
 WORKDIR /app
-COPY server/package.json server/personas.js server/server.js ./
-COPY index.html _headers manifest.webmanifest sw.js icon-*.png ./
+COPY package.json personas.js server.js ./
+COPY ../index.html ../_headers ../manifest.webmanifest ../sw.js ../icon-*.png ./
 
 ENV NODE_ENV=production
 ENV PORT=8080
