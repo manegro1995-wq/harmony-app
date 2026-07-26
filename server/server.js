@@ -1,9 +1,21 @@
+// ══════════════════════════════════════════════════════════════════
+// Harmony AI proxy · zero dependencies · Node 18+
+// ══════════════════════════════════════════════════════════════════
+// Holds the API key, streams replies to the browser as SSE, and serves
+// the static front-end that lives alongside this file.
+//
+//   POST /api/chat  → text/event-stream, frames of: data: {"text":"…"}
+//   GET  /health    → {"ok":true}
+//   GET  anything    → static file, falling back to index.html
+// ══════════════════════════════════════════════════════════════════
+
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { composeSystemBlocks, COMPANION_IDS } from './personas.js';
 
+// Every static file sits in the same folder as this file.
 const ROOT_DIR = path.dirname(fileURLToPath(import.meta.url));
 
 const {
@@ -18,13 +30,16 @@ const {
 } = process.env;
 
 if (!ANTHROPIC_API_KEY) {
-  console.error('FATAL: ANTHROPIC_API_KEY is not set.');
+  console.error('FATAL: ANTHROPIC_API_KEY is not set. Refusing to start.');
   process.exit(1);
 }
 
 const ORIGINS = ALLOWED_ORIGINS.split(',').map(o => o.trim()).filter(Boolean);
+if (!ORIGINS.length) console.warn('WARNING: ALLOWED_ORIGINS empty — all browser origins will be refused.');
+
 const MAX_BODY = 64 * 1024;
 
+// ── Rate limiting ─────────────────────────────────────────────────
 const buckets = new Map();
 function take(key, limit, windowMs) {
   const now = Date.now();
@@ -36,28 +51,36 @@ function take(key, limit, windowMs) {
 setInterval(() => {
   const now = Date.now();
   for (const [k, b] of buckets) if (now > b.reset) buckets.delete(k);
-}, 60000).unref();
+}, 60_000).unref();
 
+// ── Validation ────────────────────────────────────────────────────
 const clamp = (v, n) => (typeof v === 'string' ? v.slice(0, n) : '');
 
 export function validate(body) {
   const companion = COMPANION_IDS.includes(body?.companion) ? body.companion : 'noam';
   const userName = clamp(body?.userName, 40).replace(/[\r\n{}]/g, '').trim() || 'חבר';
+
   const history = (Array.isArray(body?.history) ? body.history : [])
     .filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
     .slice(-14)
     .map(m => ({ role: m.role, content: clamp(m.content, 4000) }))
     .filter(m => m.content.trim());
+
   while (history.length && history[0].role !== 'user') history.shift();
   if (!history.length) return { error: 'empty_history' };
+
   return {
     companion, userName, history,
+    // An enum, not free text. The value is interpolated into the system
+    // prompt below, so it must not be a place a caller can write one.
+    gender: body?.gender === 'female' ? 'female' : 'male',
     context: clamp(body?.context, 4000),
     recentOpeners: Array.isArray(body?.recentOpeners) ? body.recentOpeners : [],
     emotion: clamp(body?.emotion?.label ?? body?.emotion, 32)
   };
 }
 
+// ── Upstream SSE reader ───────────────────────────────────────────
 export async function* upstreamText(res, signal) {
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
@@ -82,6 +105,7 @@ export async function* upstreamText(res, signal) {
   } finally { try { await reader.cancel(); } catch {} }
 }
 
+// ── HTTP plumbing ─────────────────────────────────────────────────
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let size = 0; const chunks = [];
@@ -114,6 +138,7 @@ function corsHeaders(origin) {
   };
 }
 
+// ── Static file serving ───────────────────────────────────────────
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -121,6 +146,7 @@ const MIME = {
   '.json': 'application/json; charset=utf-8',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
   '.gif': 'image/gif',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
@@ -133,6 +159,8 @@ function serveStatic(req, res) {
   let rel = req.url.split('?')[0];
   if (rel === '/') rel = '/index.html';
   if (rel.startsWith('/')) rel = rel.slice(1);
+
+  // A path that climbs out of the folder is never legitimate here.
   if (rel.includes('..')) return json(res, 403, { error: 'forbidden' });
 
   try {
@@ -143,6 +171,7 @@ function serveStatic(req, res) {
     return;
   } catch {}
 
+  // Unknown path that isn't an API call → hand back the app shell.
   if (!req.url.startsWith('/api/')) {
     try {
       const content = fs.readFileSync(path.join(ROOT_DIR, 'index.html'));
@@ -151,9 +180,11 @@ function serveStatic(req, res) {
       return;
     } catch {}
   }
+
   json(res, 404, { error: 'not_found' });
 }
 
+// ── Chat ──────────────────────────────────────────────────────────
 async function handleChat(req, res, cors) {
   const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim()
           || req.socket.remoteAddress || 'unknown';
@@ -163,7 +194,7 @@ async function handleChat(req, res, cors) {
   catch (e) { return json(res, e.message === 'payload_too_large' ? 413 : 400, { error: e.message }, cors); }
 
   const session = clamp(body?.sessionId, 64) || ip;
-  if (!take('ip:' + ip, 40, 60000) || !take('sess:' + session, 20, 60000)) {
+  if (!take('ip:' + ip, 40, 60_000) || !take('sess:' + session, 20, 60_000)) {
     return json(res, 429, { error: 'rate_limited' }, { ...cors, 'retry-after': '30' });
   }
 
@@ -171,7 +202,28 @@ async function handleChat(req, res, cors) {
   if (v.error) return json(res, 400, { error: v.error }, cors);
 
   const blocks = composeSystemBlocks(v);
-  const tail = blocks.dynamic + (v.context ? `\n\n── הקשר מהאפליקציה ──\n${v.context}` : '');
+
+  /* Grammatical gender, stated once and unambiguously.
+     Hebrew conjugates the second person, so the model has to commit on
+     every verb it writes. Without this it infers from the name — which
+     is a coin toss for unisex names and simply wrong often enough that
+     women were being addressed as men throughout a conversation about
+     how they feel. Nothing undoes "I'm listening" faster.
+
+     It goes in the DYNAMIC block, after the cache marker: this varies
+     per user, and putting it in the stable prefix would fragment the
+     cache into one entry per gender for no benefit.
+
+     Placed FIRST inside the tail, ahead of the app context, because a
+     rule the model must apply to every sentence should not be trailing
+     a page of situational notes. */
+  const genderRule = v.gender === 'female'
+    ? '── לשון הפנייה ──\nהמשתמשת היא אישה. פנה אליה בלשון נקבה בכל משפט — פעלים, שמות תואר וכינויי גוף. לדוגמה: "את מרגישה", "רוצה שננסה?", "ספרי לי". זה חל על כל תשובה, גם אם ההודעה הקודמת נכתבה בלשון זכר.'
+    : '── לשון הפנייה ──\nהמשתמש הוא גבר. פנה אליו בלשון זכר בכל משפט — פעלים, שמות תואר וכינויי גוף. לדוגמה: "אתה מרגיש", "רוצה שננסה?", "ספר לי".';
+
+  const tail = genderRule
+    + (blocks.dynamic ? '\n\n' + blocks.dynamic : '')
+    + (v.context ? `\n\n── הקשר מהאפליקציה ──\n${v.context}` : '');
   const system = [
     PROMPT_CACHE === '1'
       ? { type: 'text', text: blocks.stable, cache_control: { type: 'ephemeral' } }
@@ -200,6 +252,7 @@ async function handleChat(req, res, cors) {
 
     if (!upstream.ok) {
       const out = upstream.status === 429 ? 429 : upstream.status >= 500 ? 502 : 400;
+      console.warn('upstream', upstream.status, '->', out);
       return json(res, out, { error: 'upstream_' + upstream.status }, cors);
     }
 
@@ -220,16 +273,18 @@ async function handleChat(req, res, cors) {
 
   } catch (e) {
     const aborted = e?.name === 'AbortError';
+    console.warn('chat failed:', aborted ? 'aborted/timeout' : e?.message);
     if (res.headersSent) res.end();
     else json(res, aborted ? 504 : 502, { error: 'upstream_unavailable' }, cors);
   } finally { clearTimeout(timer); }
 }
 
+// ── Router ────────────────────────────────────────────────────────
 export const server = http.createServer(async (req, res) => {
   const cors = corsHeaders(req.headers.origin);
 
   if (req.method === 'OPTIONS') { res.writeHead(cors ? 204 : 403, cors || {}); return res.end(); }
-  if (req.url === '/health') return json(res, 200, { ok: true, model: MODEL });
+  if (req.url === '/health')    return json(res, 200, { ok: true, model: MODEL });
 
   if (req.url === '/api/chat' && req.method === 'POST') {
     if (!cors) return json(res, 403, { error: 'origin_not_allowed' });
@@ -241,6 +296,10 @@ export const server = http.createServer(async (req, res) => {
 
 if (process.env.NODE_ENV !== 'test') {
   server.listen(PORT, () => {
-    console.log(`harmony-proxy :${PORT} · root=${ROOT_DIR}`);
+    console.log(`harmony-proxy :${PORT} · model=${MODEL} · origins=${ORIGINS.length || 'NONE'} · root=${ROOT_DIR}`);
   });
 }
+
+// ── ON LOGGING ────────────────────────────────────────────────────
+// Nothing here logs a message, a reply, a name, or a history. Counts,
+// statuses and latencies only. Never content.
