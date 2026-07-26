@@ -1,11 +1,13 @@
 {
-  "name": "harmony-proxy",
+  "name": "harmony-server",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=18" },
+  "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "test": "node --test"
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
