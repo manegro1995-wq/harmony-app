@@ -5200,14 +5200,19 @@ ${CONVERSATIONAL_METHODOLOGY}`;
     // call sites and would silently mis-map if the order ever drifted.
     const THERAPISTS = [
         { id:'noam',   name:'נועם',  avatar:'🧘', tagline:'מומחה מיינדפולנס וקשיבות למבוגרים',
+          nameEn:'Noam',   taglineEn:'Mindfulness and awareness for adults',
           system: buildSystemPrompt('noam') },
         { id:'mia',    name:'מיה',   avatar:'💙', tagline:'מומחית CBT וחמלה עצמית',
+          nameEn:'Mia',    taglineEn:'CBT and self-compassion',
           system: buildSystemPrompt('mia') },
         { id:'daniel', name:'דניאל', avatar:'🌿', tagline:'מומחה ACT וגמישות פסיכולוגית',
+          nameEn:'Daniel', taglineEn:'ACT and psychological flexibility',
           system: buildSystemPrompt('daniel') },
         { id:'shira',  name:'שירה',  avatar:'⭐', tagline:'מומחית IFS וחיזוק חוזקות',
+          nameEn:'Shira',  taglineEn:'IFS and building on your strengths',
           system: buildSystemPrompt('shira') },
         { id:'ori',    name:'אורי',  avatar:'🎨', tagline:'בן לוויה יצירתי — אמנות כתרפיה ומיינדפולנס',
+          nameEn:'Ori',    taglineEn:'A creative companion — art as therapy, and mindfulness',
           system: buildSystemPrompt('ori') },
         // The odd one out, deliberately. buildSystemPrompt() means he inherits
         // the same CONVERSATIONAL_METHODOLOGY as everyone else — including the
@@ -5216,8 +5221,22 @@ ${CONVERSATIONAL_METHODOLOGY}`;
         // safety net, and going through the same builder is what guarantees
         // that rather than trusting the persona text to remember.
         { id:'eitan',  name:'איתן',  avatar:'🧭', tagline:'מנטור עסקי — בהירות בעבודה, בלי לאבד את עצמך',
+          nameEn:'Eitan',  taglineEn:'A work mentor — clarity at work, without losing yourself',
           system: buildSystemPrompt('eitan') }
     ];
+
+    /* The companion's display name and description in the current
+       interface language. The id stays constant; only the label moves. */
+    function therapistName(t) {
+        if (!t) return '';
+        const en = window.HarmonyI18n && window.HarmonyI18n.locale === 'en';
+        return (en && t.nameEn) ? t.nameEn : t.name;
+    }
+    function therapistTagline(t) {
+        if (!t) return '';
+        const en = window.HarmonyI18n && window.HarmonyI18n.locale === 'en';
+        return (en && t.taglineEn) ? t.taglineEn : t.tagline;
+    }
 
     /* Helper: the API `companion` id for a therapist index, safely. */
     function therapistIdAt(index) {
@@ -10348,13 +10367,13 @@ ${CONVERSATIONAL_METHODOLOGY}`;
             const t = THERAPISTS[index]; if (!t) return;
             const set = (id, val) => { if (HarmonyApp.dom[id]) HarmonyApp.dom[id].textContent = val; };
             set('ai-avatar-header', t.avatar);
-            set('therapist-display-name', t.name);
-            set('therapist-tagline', t.tagline);
-            set('exercise-therapist-name', t.name);
+            set('therapist-display-name', therapistName(t));
+            set('therapist-tagline', therapistTagline(t));
+            set('exercise-therapist-name', therapistName(t));
             const ta = document.getElementById('toggle-avatar');
             const tn = document.getElementById('toggle-name');
             if (ta) ta.textContent = t.avatar;
-            if (tn) tn.textContent = t.name;
+            if (tn) tn.textContent = therapistName(t);
             document.querySelectorAll('.therapist-card').forEach((c, i) => {
                 c.classList.toggle('selected', i === index);
             });
@@ -10434,16 +10453,49 @@ ${CONVERSATIONAL_METHODOLOGY}`;
             ]
         },
 
+        _WELCOME_EN: {
+            returning: [
+                'Hello {name}.\n\nGood to see you here.',
+                'Hi {name}.\n\nI\'m here. We can start wherever you are.',
+                '{name}, glad you came.\n\nNo need to start anywhere in particular — whatever comes up is fine.'
+            ],
+            first: [
+                'Hello {name} 🌿\n\nI\'m {t}. Good to meet you.\n\nThere\'s no subject you need to start with — whatever is on your mind right now is enough.',
+                'Hi {name}. I\'m {t}.\n\nWe have time. Where would you like to start?'
+            ],
+            heavy: [
+                '{name}, I\'m here.\n\nYou don\'t need to find the exact words. Just start.',
+                'Hi {name}.\n\nI saw you marked things as heavy right now. I\'m not going anywhere.'
+            ],
+            cardDone: [
+                'Hello {name}.\n\nYou spent today with {theme}. What stayed with you from it?',
+                'Hi {name}.\n\n{emoji} {theme} — you already went through that today. Did it leave something behind?'
+            ],
+            cardPending: [
+                'Hello {name} 🌿\n\nToday\'s card is about {theme}. Maybe that connects to what you\'re carrying, maybe not.',
+                'Hi {name}. I\'m {t}.\n\nWhat\'s on your mind today?'
+            ],
+            plain: [
+                'Hello {name} 🌿\n\nI\'m {t}. I\'m here.',
+                'Hi {name}.\n\nI\'m {t}. What\'s going on for you?'
+            ]
+        },
+
         _lastWelcomeIdx: {},
 
         renderWelcome() {
             const messagesEl = HarmonyApp.dom['ai-messages'];
             if (!messagesEl || messagesEl.children.length > 0) return;
             const t = THERAPISTS[HarmonyApp.state.chat.therapistIndex] || THERAPISTS[0];
-            const name = HarmonyApp.state.userFirstName || 'חבר';
+            const name = HarmonyApp.state.userFirstName ||
+                ((window.HarmonyI18n && window.HarmonyI18n.locale === 'en') ? 'friend' : 'חבר');
 
             const sit = this._welcomeSituation();
-            const pool = this._WELCOME[sit.key] || this._WELCOME.plain;
+            /* Openers are authored copy, so they follow the interface
+               language — there is no user message yet to mirror. */
+            const set_ = (window.HarmonyI18n && window.HarmonyI18n.locale === 'en')
+                ? this._WELCOME_EN : this._WELCOME;
+            const pool = set_[sit.key] || set_.plain || this._WELCOME.plain;
 
             // Don't repeat the same variant twice running within a situation.
             let idx = Math.floor(Math.random() * pool.length);
@@ -10454,7 +10506,7 @@ ${CONVERSATIONAL_METHODOLOGY}`;
 
             const text = HarmonyApp.gender.text(pool[idx]
                 .replace(/\{name\}/g, name)
-                .replace(/\{t\}/g, t.name)
+                .replace(/\{t\}/g, therapistName(t))
                 .replace(/\{theme\}/g, sit.card ? sit.card.theme : '')
                 .replace(/\{emoji\}/g, sit.card ? sit.card.emoji : ''));
 
@@ -10493,11 +10545,11 @@ ${CONVERSATIONAL_METHODOLOGY}`;
             const toggleAvatar = document.getElementById('toggle-avatar');
             const toggleName   = document.getElementById('toggle-name');
             if (toggleAvatar) toggleAvatar.textContent = t.avatar;
-            if (toggleName)   toggleName.textContent   = t.name;
+            if (toggleName)   toggleName.textContent   = therapistName(t);
             if (HarmonyApp.dom['ai-avatar-header']) HarmonyApp.dom['ai-avatar-header'].textContent=t.avatar;
-            if (HarmonyApp.dom['therapist-display-name']) HarmonyApp.dom['therapist-display-name'].textContent=t.name;
-            if (HarmonyApp.dom['therapist-tagline']) HarmonyApp.dom['therapist-tagline'].textContent=t.tagline;
-            if (HarmonyApp.dom['exercise-therapist-name']) HarmonyApp.dom['exercise-therapist-name'].textContent=t.name;
+            if (HarmonyApp.dom['therapist-display-name']) HarmonyApp.dom['therapist-display-name'].textContent=therapistName(t);
+            if (HarmonyApp.dom['therapist-tagline']) HarmonyApp.dom['therapist-tagline'].textContent=therapistTagline(t);
+            if (HarmonyApp.dom['exercise-therapist-name']) HarmonyApp.dom['exercise-therapist-name'].textContent=therapistName(t);
             const messagesEl=HarmonyApp.dom['ai-messages'];
             if (messagesEl) messagesEl.innerHTML='';
             this.renderWelcome();
