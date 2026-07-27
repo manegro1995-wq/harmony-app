@@ -11,6 +11,63 @@
     <meta name="theme-color" content="#FBFAFE">
     <meta name="color-scheme" content="dark light">
 
+    <script id="harmony-i18n-preboot">
+    /* ══════════════════════════════════════════════════════════
+       PRE-BOOT LOCALE — runs before the first paint.
+
+       The locale engine near the end of this file cannot set direction
+       until HarmonyApp and HarmonyStorage exist. That is several hundred
+       milliseconds of an English user watching an RTL Hebrew shell render
+       and then flip. Direction is a layout property: flipping it after
+       paint is a visible reflow of every screen, not a cosmetic detail.
+
+       This block therefore duplicates ONE decision — which locale — using
+       the same storage key ('harmony_lang_v1') and the same priority order
+       the engine uses, and applies it to <html> immediately. The engine
+       still runs and is still the single source of truth; it simply now
+       agrees with what is already on screen instead of correcting it.
+
+       It also publishes the two helpers the rest of the app needs to be
+       locale-aware. They read HarmonyI18n once it exists and fall back to
+       the <html> attribute before then, so they are correct at any moment
+       in the boot sequence.
+    ══════════════════════════════════════════════════════════ */
+    (function () {
+        var DIR  = { he: 'rtl', en: 'ltr' };
+        var INTL = { he: 'he-IL', en: 'en-US' };
+        var code = null;
+
+        try { code = localStorage.getItem('harmony_lang_v1'); } catch (e) {}
+
+        if (!DIR[code]) {
+            code = null;
+            try {
+                var langs = navigator.languages || [navigator.language || ''];
+                for (var i = 0; i < langs.length; i++) {
+                    var c = String(langs[i]).toLowerCase().slice(0, 2);
+                    if (DIR[c]) { code = c; break; }
+                }
+            } catch (e) {}
+        }
+        if (!DIR[code]) code = 'he';
+
+        var h = document.documentElement;
+        h.setAttribute('lang', code);
+        h.setAttribute('dir', DIR[code]);
+        h.setAttribute('data-locale', code);
+
+        /* Current language code — 'he' | 'en'. */
+        window.__hLocale = function () {
+            var l = null;
+            try { l = window.HarmonyI18n && window.HarmonyI18n.locale; } catch (e) {}
+            if (!DIR[l]) l = document.documentElement.getAttribute('data-locale');
+            return DIR[l] ? l : 'he';
+        };
+        /* BCP-47 tag for Intl, SpeechSynthesis and SpeechRecognition. */
+        window.__hIntl = function () { return INTL[window.__hLocale()] || 'he-IL'; };
+    })();
+    </script>
+
     <!-- PWA — installable, offline-capable shell (see sw.js) -->
     <link rel="manifest" href="manifest.webmanifest">
     <meta name="mobile-web-app-capable" content="yes">
@@ -4332,7 +4389,7 @@
 
                     <!-- ── 60-second micro practice ── -->
                     <div class="panel" id="card-ex-panel">
-                        <div class="panel-title" style="font-size:var(--fs-md);" data-i18n="t.e263a5"><svg class="pi" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="13.6" r="7.4"/><path d="M12 9.8v3.8l2.5 1.5M9.4 2.6h5.2"/></svg>תרגול של <span id="card-ex-sec">60</span> שניות</div>
+                        <div class="panel-title" style="font-size:var(--fs-md);" data-i18n="t.e263a5"><svg class="pi" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="13.6" r="7.4"/><path d="M12 9.8v3.8l2.5 1.5M9.4 2.6h5.2"/></svg>תרגול של <span id="card-ex-sec">60</span> <span data-i18n="frag.seconds">שניות</span></div>
                         <div class="cotm-ex-head">
                             <span class="cotm-ex-count" id="card-ex-count" aria-hidden="true">60</span>
                             <button class="btn btn-primary btn-compact-square" id="card-ex-btn"
@@ -4373,9 +4430,8 @@
                         <strong data-i18n="t.a08970">כל מה שתעשה יימחק ברגע שתרענן או תסגור.</strong>
                     </div>
                     <div class="panel-sub" style="margin-top:0" data-i18n="t.1965ca">
-                        זה קורה כשפותחים את הקובץ ישירות (כתובת שמתחילה ב-<code>content://</code> או <code>file://</code>),
-                        או בגלישה פרטית. הפתרון: לפתוח את האפליקציה מכתובת <code>https://</code> אמיתית,
-                        או דרך אפליקציית המעטפת — ואז הכל יישמר כרגיל.
+                        זה קורה כשפותחים את הקובץ ישירות (כתובת שמתחילה ב-<code>content://</code> <span data-i18n="frag.or">או</span> <code>file://</code>),
+                        <span data-i18n="frag.storage.mid">או בגלישה פרטית. הפתרון: לפתוח את האפליקציה מכתובת</span> <code>https://</code> <span data-i18n="frag.storage.tail">אמיתית, או דרך אפליקציית המעטפת — ואז הכל יישמר כרגיל.</span>
                     </div>
                     <div class="panel-sub" style="margin-top:0;opacity:0.7" id="storage-driver-line"></div>
                 </div>
@@ -6884,7 +6940,7 @@ ${CONVERSATIONAL_METHODOLOGY}`;
             // of March no longer light up the 5th of every other month.
             const {year, month} = HarmonyApp.state.calendar;
             const today = new Date();
-            if (title) title.textContent = new Date(year, month, 1).toLocaleDateString('he-IL',{month:'long',year:'numeric'});
+            if (title) title.textContent = new Date(year, month, 1).toLocaleDateString(window.__hIntl(),{month:'long',year:'numeric'});
             const firstDay = new Date(year, month, 1).getDay();
             const totalDays = new Date(year, month+1, 0).getDate();
             grid.innerHTML = '';
@@ -8124,7 +8180,7 @@ ${CONVERSATIONAL_METHODOLOGY}`;
             const d = this.collect();
             const L = [];
             L.push('רוגע — Harmony');
-            L.push('הנתונים שלך, ' + new Date().toLocaleDateString('he-IL'));
+            L.push('הנתונים שלך, ' + new Date().toLocaleDateString(window.__hIntl()));
             L.push('הקובץ נוצר במכשיר שלך ולא נשלח לשום מקום.');
             L.push('='.repeat(46), '');
 
@@ -8286,8 +8342,8 @@ ${CONVERSATIONAL_METHODOLOGY}`;
             ta.value = m.summary;
             if (meta) {
                 const d = new Date(m.updatedAt);
-                meta.textContent = 'עודכן ' + d.toLocaleDateString('he-IL') + ' ' +
-                    d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+                meta.textContent = 'עודכן ' + d.toLocaleDateString(window.__hIntl()) + ' ' +
+                    d.toLocaleTimeString(window.__hIntl(), { hour: '2-digit', minute: '2-digit' });
             }
         },
 
@@ -8869,7 +8925,7 @@ ${CONVERSATIONAL_METHODOLOGY}`;
                 dot.textContent = this._DAY_LETTERS[d.getDay()];
                 dot.setAttribute('aria-label',
                     (isToday ? 'היום, ' : '') +
-                    d.toLocaleDateString('he-IL') +
+                    d.toLocaleDateString(window.__hIntl()) +
                     (done ? ' — הושלם' : ' — לא הושלם'));
                 wrap.appendChild(dot);
             }
@@ -9109,7 +9165,7 @@ ${CONVERSATIONAL_METHODOLOGY}`;
                 const known = [];
                 const unknown = [];
 
-                known.push('השעה כעת ' + now.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })
+                known.push('השעה כעת ' + now.toLocaleTimeString(window.__hIntl(), { hour: '2-digit', minute: '2-digit' })
                     + ' (' + this._partOfDay(now.getHours()) + ').');
 
                 // ── stress: user-reported only ──────────────────────────
@@ -11245,7 +11301,7 @@ ${CONVERSATIONAL_METHODOLOGY}`;
                         // `text` stays first and unchanged: a server that
                         // ignores the new fields behaves exactly as before.
                         text: spoken,
-                        lang: 'he-IL',
+                        lang: window.__hIntl(),
                         ssml: this._toSSML(chunks, profile),
                         voiceProfile: {
                             companion: therapistIdAt(HarmonyApp.state.chat.therapistIndex),
@@ -11289,10 +11345,17 @@ ${CONVERSATIONAL_METHODOLOGY}`;
             }
 
             const doSpeak = (voices) => {
-                // Best voice priority: he-IL > he > any
-                const heVoice = voices.find(v => v.lang === 'he-IL') ||
-                                voices.find(v => v.lang.startsWith('he')) ||
-                                voices.find(v => v.lang.startsWith('ar')) ||
+                /* Best voice priority: exact tag > same language > a
+                   language-specific last resort. The Arabic fallback below
+                   exists because Arabic voices approximate Hebrew phonetics
+                   acceptably on devices that ship no Hebrew voice — it is
+                   nonsense for English, which is why the fallback chain is
+                   now built from the ACTIVE locale rather than assumed. */
+                const _tag  = window.__hIntl();
+                const _lang = _tag.slice(0, 2);
+                const heVoice = voices.find(v => v.lang === _tag) ||
+                                voices.find(v => v.lang && v.lang.replace('_', '-').startsWith(_lang)) ||
+                                (_lang === 'he' ? voices.find(v => v.lang && v.lang.startsWith('ar')) : null) ||
                                 null;
 
                 const profile = this._voiceProfile();
@@ -11324,7 +11387,7 @@ ${CONVERSATIONAL_METHODOLOGY}`;
                     const chunk = chunks[idx++];
 
                     const utt = new SpeechSynthesisUtterance(chunk.text);
-                    utt.lang   = 'he-IL';
+                    utt.lang   = window.__hIntl();
                     utt.volume = HarmonyApp.state.tts.volume;
                     utt.rate   = profile.rate;
                     utt.pitch  = profile.pitch;
@@ -11463,7 +11526,7 @@ ${CONVERSATIONAL_METHODOLOGY}`;
             if (this._dictating) { try { this._dictating.rec.stop(); } catch(e) {} }
 
             const rec = new SR();
-            rec.lang = 'he-IL'; rec.continuous = false; rec.interimResults = false;
+            rec.lang = window.__hIntl(); rec.continuous = false; rec.interimResults = false;
 
             const done = () => {
                 this._dictating = null;
@@ -11519,7 +11582,7 @@ ${CONVERSATIONAL_METHODOLOGY}`;
             } else {
                 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
                 const rec = new SR();
-                rec.lang = 'he-IL'; rec.continuous = false; rec.interimResults = false;
+                rec.lang = window.__hIntl(); rec.continuous = false; rec.interimResults = false;
                 rec.onresult = e => {
                     const txt = e.results[0][0].transcript;
                     const inp = HarmonyApp.dom['ai-input'];
@@ -11695,7 +11758,7 @@ ${CONVERSATIONAL_METHODOLOGY}`;
                     document.getElementById('hr-health-save').style.display = 'flex';
                     document.getElementById('hr-health-last').textContent = this._last.bpm + ' BPM';
                     document.getElementById('hr-health-meta').textContent =
-                        `אחרון: ${this._last.bpm} · ממוצע 7 ימים: ${avg} · ${new Date(this._last.timestamp).toLocaleString('he-IL')}`;
+                        `אחרון: ${this._last.bpm} · ממוצע 7 ימים: ${avg} · ${new Date(this._last.timestamp).toLocaleString(window.__hIntl())}`;
                 } catch (e) {
                     HarmonyApp.ui.showToast('שגיאה בקריאה ממערכת הבריאות', 'var(--red)');
                     console.warn('[HR] health fetch failed', e);
@@ -12526,7 +12589,7 @@ ${CONVERSATIONAL_METHODOLOGY}`;
                     const item = document.createElement('div');
                     item.className = 'hr-history-item';
                     const date = new Date(entry.timestamp);
-                    const dateStr = date.toLocaleDateString('he-IL', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+                    const dateStr = date.toLocaleDateString(window.__hIntl(), { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
 
                     const bpmDiv = document.createElement('div');
                     bpmDiv.className = 'hr-history-bpm';
@@ -12569,7 +12632,7 @@ ${CONVERSATIONAL_METHODOLOGY}`;
                     const sourceLabels = { camera: 'מצלמה', bluetooth: 'Bluetooth', health: 'מערכת בריאות' };
                     const zoneLabels = { low: 'נמוך', normal: 'תקין', high: 'גבוה' };
                     const hrZone = HarmonyApp.heartRate.history.getHRZone(e.bpm);
-                    return `${d.toLocaleDateString('he-IL')},${d.toLocaleTimeString('he-IL')},${e.bpm},${sourceLabels[e.source]||e.source},${zoneLabels[e.zone]||e.zone},${hrZone.name}`;
+                    return `${d.toLocaleDateString(window.__hIntl())},${d.toLocaleTimeString(window.__hIntl())},${e.bpm},${sourceLabels[e.source]||e.source},${zoneLabels[e.zone]||e.zone},${hrZone.name}`;
                 }).join('\n');
                 const csv = '\uFEFF' + header + rows;
 
@@ -12619,7 +12682,7 @@ ${CONVERSATIONAL_METHODOLOGY}`;
                 // sharing this origin, and it flows into document.write().
                 const rows = entries.map(e => {
                     const d = new Date(e.timestamp);
-                    const when = `${d.toLocaleDateString('he-IL')} ${d.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}`;
+                    const when = `${d.toLocaleDateString(window.__hIntl())} ${d.toLocaleTimeString(window.__hIntl(),{hour:'2-digit',minute:'2-digit'})}`;
                     const bpm = Number(e.bpm) || 0;
                     const source = sourceLabels[e.source] || 'לא ידוע';   // whitelist — no raw value
                     const zone = zoneLabels[e.zone] || '—';
@@ -12634,7 +12697,7 @@ ${CONVERSATIONAL_METHODOLOGY}`;
                     + `table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px 10px;text-align:right;font-size:13px}`
                     + `th{background:#f3f4f6}.d{margin-top:22px;font-size:10px;color:#666;line-height:1.6;border-top:1px solid #eee;padding-top:12px}</style></head>`
                     + `<body><h1>🌳 רוגע Harmony — היסטוריית מדידות דופק</h1>`
-                    + `<div class="sub">הופק בתאריך ${new Date().toLocaleDateString('he-IL')} · ${entries.length} מדידות</div>`
+                    + `<div class="sub">הופק בתאריך ${new Date().toLocaleDateString(window.__hIntl())} · ${entries.length} מדידות</div>`
                     + `<table><thead><tr><th>תאריך ושעה</th><th>מקור</th><th>BPM</th><th>מצב</th></tr></thead><tbody>${rows}</tbody></table>`
                     + `<div class="d">${disclaimer}</div></body></html>`;
                 const w = window.open('', '_blank');
@@ -15070,6 +15133,45 @@ ${COMPACT_SAFETY_NOTE}`;
         else { bootApp(); }
     });
     </script>
+
+    <script id="harmony-global-bridge">
+    /* ══════════════════════════════════════════════════════════════════
+       GLOBAL BRIDGE — makes the core objects reachable as window properties.
+
+       WHY THIS EXISTS. HarmonyApp and HarmonyStorage are declared with
+       `const` at the top level of a classic (non-module) script. That
+       creates a binding in the GLOBAL LEXICAL ENVIRONMENT, which is a
+       different place from the global OBJECT. The practical consequence is
+       the one that matters here:
+
+           typeof HarmonyApp          // "object"  — resolves lexically
+           typeof window.HarmonyApp   // "undefined" — never a property
+
+       Inline onclick handlers and the app itself never noticed, because
+       they resolve names through the scope chain. But every later module
+       in this file gates its startup on the window property:
+
+           if (!window.HarmonyApp || !window.HarmonyStorage)
+               return setTimeout(boot, 120);
+
+       That condition can never become true, so those modules polled every
+       120ms for the entire session and never started. Confirmed in a real
+       browser: the language picker never appeared, the app-bar toggle and
+       Settings selector were never injected, the chosen language was never
+       persisted (S() returned undefined and the write was swallowed by the
+       surrounding try/catch), the AI never received its output-language
+       directive, and the XP/progress layer never seeded either.
+
+       Two assignments fix all of it. Nothing else changes: the lexical
+       bindings stay exactly as they were, so no existing call site is
+       affected, and this is placed immediately after the block that
+       defines them and before the first module that waits on them.
+    ══════════════════════════════════════════════════════════════════ */
+    (function () {
+        try { if (!window.HarmonyApp     && typeof HarmonyApp     !== "undefined") window.HarmonyApp     = HarmonyApp; } catch (e) {}
+        try { if (!window.HarmonyStorage && typeof HarmonyStorage !== "undefined") window.HarmonyStorage = HarmonyStorage; } catch (e) {}
+    })();
+    </script>
     <!-- Service worker registration. Only on http(s): on a file:// build
          this is a silent no-op, so bundled wrappers are unaffected. Once
          served over HTTPS it enables offline use and lets the docked
@@ -16391,7 +16493,7 @@ ${COMPACT_SAFETY_NOTE}`;
             try {
                 var d = new Date(iso + 'T00:00:00');
                 if (isNaN(d)) return esc(iso);
-                return d.toLocaleDateString('he-IL', {
+                return d.toLocaleDateString(window.__hIntl(), {
                     day: 'numeric', month: 'long', year: 'numeric'
                 });
             } catch (e) { return esc(iso); }
@@ -16586,7 +16688,7 @@ ${COMPACT_SAFETY_NOTE}`;
 
         function buildDoc(d) {
             var now = new Date();
-            var stamp = now.toLocaleDateString('he-IL', {
+            var stamp = now.toLocaleDateString(window.__hIntl(), {
                 day: 'numeric', month: 'long', year: 'numeric'
             });
             var name = (d.profile && d.profile.firstName) ? esc(d.profile.firstName) : '';
@@ -18007,6 +18109,22 @@ ${COMPACT_SAFETY_NOTE}`;
                 _DEFAULT:          3
             },
 
+            /* English forms of the level names. They are kept beside the
+               levels themselves so the two lists cannot drift apart: adding
+               a level without an English name is then visibly incomplete
+               here rather than silently Hebrew in the English interface. */
+            LEVEL_NAMES_EN: {
+                'התחלה': 'Beginning',
+                'נשימה': 'Breath',
+                'מודעות': 'Awareness',
+                'רוגע': 'Calm',
+                'איזון': 'Balance',
+                'נוכחות': 'Presence',
+                'בהירות': 'Clarity',
+                'הרמוניה': 'Harmony',
+                'עומק': 'Depth',
+                'שלמות': 'Wholeness'
+            },
             LEVELS: [
                 { min: 0,    name: 'התחלה',  icon: '🌱' },
                 { min: 100,  name: 'נשימה',  icon: '🌬️' },
@@ -18115,6 +18233,21 @@ ${COMPACT_SAFETY_NOTE}`;
         const S  = () => window.HarmonyStorage;
         const A  = () => window.HarmonyApp;
         const now = () => Date.now();
+
+        /* ── level label localisation ────────────────────────────────
+           Read the locale live rather than caching it: these helpers are
+           called during render, and render is exactly what a language
+           switch triggers. */
+        const isEn = () => {
+            try { return window.__hLocale && window.__hLocale() === 'en'; }
+            catch (e) { return false; }
+        };
+        /* The word "level", not a level name. */
+        const lvWord   = () => (isEn() ? 'Level' : 'שלב');
+        const lvUpWord = () => (isEn() ? 'Level up' : 'עלית שלב');
+        /* An unmapped name falls back to the Hebrew rather than to a key or
+           to empty text — a user must never see either. */
+        const lvName = n => (isEn() ? (CONFIG.LEVEL_NAMES_EN[n] || n) : n);
 
         function todayKey(d) {
             d = d || new Date();
@@ -18673,7 +18806,7 @@ ${COMPACT_SAFETY_NOTE}`;
                         '<div class="hp-lv-icon">' + info.icon + '</div>' +
                         '<div class="hp-lv-kicker">עלית שלב</div>' +
                         '<div class="hp-lv-name">' + this._esc(info.name) + '</div>' +
-                        '<div class="hp-lv-num">שלב ' + info.number + '</div>' +
+                        '<div class="hp-lv-num">' + lvWord() + ' ' + info.number + '</div>' +
                         rewardHtml +
                         '<button type="button" class="btn btn-ghost btn-compact hp-lv-btn">המשך</button>' +
                     '</div>';
@@ -18691,7 +18824,7 @@ ${COMPACT_SAFETY_NOTE}`;
                 // Auto-dismiss: the brief asked not to block the app, and a
                 // modal you must dismiss to keep breathing is a block.
                 setTimeout(close, 5200);
-                this._announce('עלית שלב ' + info.number + ' — ' + info.name);
+                this._announce(lvUpWord() + ' ' + info.number + ' — ' + lvName(info.name));
             },
 
             /* ── achievement sheet, queued ──────────────────────────── */
@@ -18760,10 +18893,10 @@ ${COMPACT_SAFETY_NOTE}`;
                     const el = document.getElementById(id);
                     if (el) el.textContent = txt;
                 };
-                set('xp-level-lbl', 'שלב ' + info.number + ' — ' + info.name + ' ' + info.icon);
+                set('xp-level-lbl', lvWord() + ' ' + info.number + ' — ' + lvName(info.name) + ' ' + info.icon);
                 set('xp-points-lbl', info.isMax
-                    ? info.xp.toLocaleString('he-IL') + ' XP'
-                    : info.xp.toLocaleString('he-IL') + ' / ' + info.nextAt.toLocaleString('he-IL') + ' XP');
+                    ? info.xp.toLocaleString(window.__hIntl()) + ' XP'
+                    : info.xp.toLocaleString(window.__hIntl()) + ' / ' + info.nextAt.toLocaleString(window.__hIntl()) + ' XP');
 
                 const bar = document.getElementById('xp-bar-fill');
                 if (bar) {
@@ -18780,7 +18913,7 @@ ${COMPACT_SAFETY_NOTE}`;
                 }
                 set('hp-to-next', info.isMax
                     ? 'הגעת לשלב האחרון ✨'
-                    : info.toNext.toLocaleString('he-IL') + ' XP לשלב הבא');
+                    : info.toNext.toLocaleString(window.__hIntl()) + ' XP לשלב הבא');
 
                 const st = Engine.streak();
                 const sEl = document.getElementById('hp-streak-line');
@@ -18965,7 +19098,7 @@ ${COMPACT_SAFETY_NOTE}`;
                             '<div class="hp-reward-title">' + this._esc(r.title) + '</div>' +
                             '<div class="hp-reward-desc">' + this._esc(r.desc) + '</div>' +
                         '</div>' +
-                        '<div class="hp-reward-lvl">שלב ' + r.level + '</div>' +
+                        '<div class="hp-reward-lvl">' + lvWord() + ' ' + r.level + '</div>' +
                     '</div>').join('');
                 this._sheet('מה נפתח במסע', '', html);
             },
@@ -19518,6 +19651,10 @@ ${COMPACT_SAFETY_NOTE}`;
     <script id="harmony-i18n-catalog">
     window.__harmonyStrings = {
         he: {
+        "frag.seconds": "שניות",
+        "frag.or": "או",
+        "frag.storage.mid": "או בגלישה פרטית. הפתרון: לפתוח את האפליקציה מכתובת",
+        "frag.storage.tail": "אמיתית, או דרך אפליקציית המעטפת — ואז הכל יישמר כרגיל.",
         "attr_aria_label.038325": "עוצמת תדר 528 הרץ",
         "attr_aria_label.044610": "🤯 מוצף",
         "attr_aria_label.0638e6": "שמור את הרגע הזה",
@@ -20060,6 +20197,10 @@ ${COMPACT_SAFETY_NOTE}`;
         "t_xp.4cb164": "התקדמות (XP)"
 },
         en: {
+        "frag.seconds": "seconds",
+        "frag.or": "or",
+        "frag.storage.mid": "or in private browsing. The fix: open the app from a real address starting with",
+        "frag.storage.tail": "or through the wrapper app — and then everything is saved as usual.",
         "attr_aria_label.038325": "528 Hz tone volume",
         "attr_aria_label.044610": "🤯 Overwhelmed",
         "attr_aria_label.0638e6": "Keep this moment",
@@ -22453,6 +22594,11 @@ ${COMPACT_SAFETY_NOTE}`;
                 }
             }
 
+            /* Seeded initial text (see the note above the module). */
+            const inits = root.querySelectorAll('[data-i18n-init]');
+            for (let i = 0; i < inits.length; i++) applyInit(inits[i]);
+            if (root.matches && root.matches('[data-i18n-init]')) applyInit(root);
+
             ATTRS.forEach(attr => {
                 const sel = '[data-i18n-' + attr + ']';
                 const list = root.querySelectorAll(sel);
@@ -22462,6 +22608,33 @@ ${COMPACT_SAFETY_NOTE}`;
                     if (val !== '') el.setAttribute(attr, val);
                 }
             });
+        }
+
+        /* True only while the element still shows one of the values this
+           key can produce — i.e. the app has not replaced it with live
+           state yet. Comparing against every locale's value (not just the
+           current one) is what makes the check survive repeated switching. */
+        function isUntouched(el, key) {
+            const now = (el.textContent || '').trim();
+            if (!now) return true;
+            const cats = window.__harmonyStrings || {};
+            for (const loc in cats) {
+                const v = cats[loc] && cats[loc][key];
+                if (v !== undefined && String(v).trim() === now) return true;
+            }
+            return false;
+        }
+
+        function applyInit(el) {
+            const key = el.getAttribute('data-i18n-init');
+            if (!key || !isUntouched(el, key)) return;
+            const val = t(key);
+            if (val === '') return;
+            for (let j = 0; j < el.childNodes.length; j++) {
+                const n = el.childNodes[j];
+                if (n.nodeType === 3 && n.nodeValue.trim()) { n.nodeValue = val; return; }
+            }
+            el.insertBefore(document.createTextNode(val), el.firstChild);
         }
 
         function applyAll() { applyTo(document.body); }
@@ -22577,6 +22750,13 @@ ${COMPACT_SAFETY_NOTE}`;
             try { A().ui.renderXP(); } catch (e) {}
             try { window.HarmonyProgress.render(); } catch (e) {}
             try { A().dailyCard.render(); } catch (e) {}
+            /* Locale-dependent surfaces that build their own text in JS.
+               Each is isolated: a module that is absent in some build, or
+               throws, must not stop the ones after it from redrawing. */
+            try { A().ui.renderStreakStrip(); } catch (e) {}
+            try { A().achievements.render(); } catch (e) {}
+            try { A().heartRate.renderSummary(); } catch (e) {}
+            try { A().ui.renderTree(); } catch (e) {}
 
             listeners.forEach(fn => { try { fn(code, LANGUAGES[code]); } catch (e) {} });
 
@@ -22595,6 +22775,7 @@ ${COMPACT_SAFETY_NOTE}`;
             if (!force && hasPicked()) return;
             if (document.getElementById('hi18n-picker')) return;
 
+            const lastFocus = document.activeElement;
             const ov = document.createElement('div');
             ov.id = 'hi18n-picker';
             ov.className = 'hi18n-picker';
@@ -22632,6 +22813,45 @@ ${COMPACT_SAFETY_NOTE}`;
                 setLocale(code);
                 ov.classList.remove('open');
                 setTimeout(() => { try { ov.remove(); } catch (e2) {} }, 380);
+            });
+
+            /* ── modal focus management ──────────────────────────────
+               The overlay declares role="dialog" aria-modal="true", which
+               tells a screen reader that everything behind it is out of
+               scope. Without focus containment that promise is false: a
+               keyboard user tabbing through this dialog walks straight out
+               into the ~129 focusable controls of the app underneath, while
+               the screen reader still reports them as unreachable. Escape
+               did nothing either, so a keyboard user who opened the picker
+               from Settings had no way to leave without changing language.
+
+               Contained here rather than with the `inert` attribute, which
+               is unsupported in the older Android WebViews this app is
+               explicitly built to tolerate. */
+            const focusables = () => Array.from(
+                ov.querySelectorAll('button:not([disabled]),[tabindex]:not([tabindex="-1"])'));
+
+            ov.addEventListener('keydown', e => {
+                if (e.key === 'Escape') {
+                    /* A choice is not mandatory: the resolved locale is
+                       already applied and Settings can change it at any
+                       time. Refusing to close would be a keyboard trap. */
+                    e.preventDefault();
+                    try { S().setRaw(PICKED_KEY, '1'); } catch (e2) {}
+                    ov.classList.remove('open');
+                    setTimeout(() => { try { ov.remove(); } catch (e2) {} }, 380);
+                    try { if (lastFocus && lastFocus.focus) lastFocus.focus(); } catch (e2) {}
+                    return;
+                }
+                if (e.key !== 'Tab') return;
+                const f = focusables();
+                if (!f.length) return;
+                const first = f[0], last = f[f.length - 1];
+                if (e.shiftKey && document.activeElement === first) {
+                    e.preventDefault(); last.focus();
+                } else if (!e.shiftKey && document.activeElement === last) {
+                    e.preventDefault(); first.focus();
+                }
             });
 
             setTimeout(() => { try { ov.querySelector('.hi18n-opt').focus(); } catch (e) {} }, 120);
@@ -22893,6 +23113,7 @@ ${COMPACT_SAFETY_NOTE}`;
             return false;
         }
 
+        /* he → en, straight from the catalogue. */
         function map() {
             const I = window.HarmonyI18n;
             const m = window.__harmonyRuntimeStrings;
@@ -22901,12 +23122,61 @@ ${COMPACT_SAFETY_NOTE}`;
             return (loc && loc !== 'he' && m[loc]) ? m[loc] : null;
         }
 
-        function translateTextNode(n, dict) {
+        /* en → he, derived. Built once, lazily, and pruned of anything
+           ambiguous or too short to be safe (see the note above). */
+        let _inverse = null;
+        function inverseMap() {
+            if (_inverse !== null) return _inverse;
+            const m = window.__harmonyRuntimeStrings;
+            if (!m || !m.en) { _inverse = false; return false; }
+            const out = Object.create(null);
+            const seen = Object.create(null);
+            for (const he in m.en) {
+                const en = m.en[he];
+                if (typeof en !== 'string') continue;
+                const k = en.trim();
+                if (k.length < 3 || k === he.trim()) continue;
+                if (seen[k]) { delete out[k]; continue; }   // ambiguous — drop
+                seen[k] = 1;
+                out[k] = he;
+            }
+            _inverse = out;
+            return out;
+        }
+
+        const HEB_RE = /[\u0590-\u05FF]/;
+
+        /* Has this session ever rendered a non-default locale? If not, no
+           English string can be on screen, so the reverse pass has nothing
+           to find and the observer work is pure cost. Hebrew is the default
+           and most sessions never leave it, so this guard is what keeps the
+           reverse capability from taxing the common case. */
+        let everForeign = false;
+
+        /* Which direction, if any, applies right now. */
+        function activeDict() {
+            const I = window.HarmonyI18n;
+            if (!I) return null;
+            if (I.locale !== 'he') {
+                everForeign = true;
+                const d = map();
+                return d ? { dict: d, back: false } : null;
+            }
+            if (!everForeign) return null;
+            const inv = inverseMap();
+            return inv ? { dict: inv, back: true } : null;
+        }
+
+        function translateTextNode(n, mode) {
             const raw = n.nodeValue;
             if (!raw) return;
             const key = raw.trim();
             if (!key || key.length < 2) return;
-            const hit = dict[key];
+            /* Returning to Hebrew: only ever rewrite text that is currently
+               NOT Hebrew. This makes the reverse pass idempotent and means a
+               string that was already correct cannot be disturbed. */
+            if (mode.back && HEB_RE.test(key)) return;
+            const hit = mode.dict[key];
             if (hit === undefined) return;
             // preserve the original surrounding whitespace exactly
             const lead = raw.slice(0, raw.length - raw.trimStart().length);
@@ -22914,10 +23184,10 @@ ${COMPACT_SAFETY_NOTE}`;
             n.nodeValue = lead + hit + trail;
         }
 
-        function walk(root, dict) {
+        function walk(root, mode) {
             if (!root) return;
             if (root.nodeType === 3) {
-                if (!isUserContent(root)) translateTextNode(root, dict);
+                if (!isUserContent(root)) translateTextNode(root, mode);
                 return;
             }
             if (root.nodeType !== 1) return;
@@ -22930,7 +23200,7 @@ ${COMPACT_SAFETY_NOTE}`;
             for (let i = 0; i < batch.length; i++) {
                 const node = batch[i];
                 if (isUserContent(node)) continue;
-                translateTextNode(node, dict);
+                translateTextNode(node, mode);
             }
 
             /* Attributes that surface as visible or announced text. */
@@ -22942,16 +23212,17 @@ ${COMPACT_SAFETY_NOTE}`;
                 ['aria-label', 'placeholder', 'title'].forEach(a => {
                     const v = el.getAttribute(a);
                     if (!v) return;
-                    const hit = dict[v.trim()];
+                    if (mode.back && HEB_RE.test(v)) return;
+                    const hit = mode.dict[v.trim()];
                     if (hit !== undefined) el.setAttribute(a, hit);
                 });
             }
         }
 
         function applyAll() {
-            const dict = map();
-            if (!dict) return;
-            walk(document.body, dict);
+            const mode = activeDict();
+            if (!mode) return;
+            walk(document.body, mode);
         }
 
         /* Observe insertions. Batched through rAF so a burst of DOM writes
@@ -22961,7 +23232,7 @@ ${COMPACT_SAFETY_NOTE}`;
         function watch() {
             if (observer || !window.MutationObserver) return;
             observer = new MutationObserver(muts => {
-                if (!map()) return;
+                if (!activeDict()) return;
                 for (const m of muts) {
                     if (m.type === 'characterData') { queue.push(m.target); continue; }
                     for (const n of m.addedNodes) queue.push(n);
@@ -22969,10 +23240,10 @@ ${COMPACT_SAFETY_NOTE}`;
                 if (queue.length && !pending) {
                     pending = requestAnimationFrame(() => {
                         pending = null;
-                        const dict = map();
+                        const mode = activeDict();
                         const batch = queue; queue = [];
-                        if (!dict) return;
-                        batch.forEach(n => { try { walk(n, dict); } catch (e) {} });
+                        if (!mode) return;
+                        batch.forEach(n => { try { walk(n, mode); } catch (e) {} });
                     });
                 }
             });
@@ -23008,9 +23279,9 @@ ${COMPACT_SAFETY_NOTE}`;
             watch();
             applyAll();
             window.HarmonyI18n.onChange(() => {
-                // On switch back to Hebrew the modules re-render themselves
-                // (setLocale calls their render functions), which restores
-                // the Hebrew source text. Nothing to undo here.
+                /* Both directions now. Four modules re-render themselves on
+                   a switch; everything else on screen is converted in place
+                   by the pass above, in whichever direction applies. */
                 applyAll();
             });
             try {
