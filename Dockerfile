@@ -1,9 +1,11 @@
-FROM python:3.11-slim
+FROM node:20-alpine
 
 WORKDIR /app
 
 COPY . .
 
+RUN npm install -g serve
+
 EXPOSE 3000
 
-CMD ["python", "-m", "http.server", "3000", "--bind", "0.0.0.0"]
+CMD ["serve", "-s", ".", "-l", "3000"]
