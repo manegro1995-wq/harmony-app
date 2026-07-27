@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM python:3.11-slim
 
 WORKDIR /app
 
@@ -6,4 +6,4 @@ COPY . .
 
 EXPOSE 3000
 
-CMD ["npx", "http-server", ".", "-p", "3000", "--gzip"]
+CMD ["python", "-m", "http.server", "3000"]
