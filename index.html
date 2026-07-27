@@ -11,6 +11,63 @@
     <meta name="theme-color" content="#FBFAFE">
     <meta name="color-scheme" content="dark light">
 
+    <script id="harmony-i18n-preboot">
+    /* ══════════════════════════════════════════════════════════
+       PRE-BOOT LOCALE — runs before the first paint.
+
+       The locale engine near the end of this file cannot set direction
+       until HarmonyApp and HarmonyStorage exist. That is several hundred
+       milliseconds of an English user watching an RTL Hebrew shell render
+       and then flip. Direction is a layout property: flipping it after
+       paint is a visible reflow of every screen, not a cosmetic detail.
+
+       This block therefore duplicates ONE decision — which locale — using
+       the same storage key ('harmony_lang_v1') and the same priority order
+       the engine uses, and applies it to <html> immediately. The engine
+       still runs and is still the single source of truth; it simply now
+       agrees with what is already on screen instead of correcting it.
+
+       It also publishes the two helpers the rest of the app needs to be
+       locale-aware. They read HarmonyI18n once it exists and fall back to
+       the <html> attribute before then, so they are correct at any moment
+       in the boot sequence.
+    ══════════════════════════════════════════════════════════ */
+    (function () {
+        var DIR  = { he: 'rtl', en: 'ltr' };
+        var INTL = { he: 'he-IL', en: 'en-US' };
+        var code = null;
+
+        try { code = localStorage.getItem('harmony_lang_v1'); } catch (e) {}
+
+        if (!DIR[code]) {
+            code = null;
+            try {
+                var langs = navigator.languages || [navigator.language || ''];
+                for (var i = 0; i < langs.length; i++) {
+                    var c = String(langs[i]).toLowerCase().slice(0, 2);
+                    if (DIR[c]) { code = c; break; }
+                }
+            } catch (e) {}
+        }
+        if (!DIR[code]) code = 'he';
+
+        var h = document.documentElement;
+        h.setAttribute('lang', code);
+        h.setAttribute('dir', DIR[code]);
+        h.setAttribute('data-locale', code);
+
+        /* Current language code — 'he' | 'en'. */
+        window.__hLocale = function () {
+            var l = null;
+            try { l = window.HarmonyI18n && window.HarmonyI18n.locale; } catch (e) {}
+            if (!DIR[l]) l = document.documentElement.getAttribute('data-locale');
+            return DIR[l] ? l : 'he';
+        };
+        /* BCP-47 tag for Intl, SpeechSynthesis and SpeechRecognition. */
+        window.__hIntl = function () { return INTL[window.__hLocale()] || 'he-IL'; };
+    })();
+    </script>
+
     <!-- PWA — installable, offline-capable shell (see sw.js) -->
     <link rel="manifest" href="manifest.webmanifest">
     <meta name="mobile-web-app-capable" content="yes">
@@ -3568,7 +3625,7 @@
         <button class="btn btn-primary" onclick="HarmonyApp.biometric.authenticate()" style="min-height:52px;border-radius:var(--r-sm);padding:0 var(--sp-xl);" id="bio-unlock-btn" aria-label="🔓 כניסה ביומטרית" data-i18n-aria-label="attr_aria_label.dff4f0" data-i18n="t.dff4f0">
             🔓 כניסה ביומטרית
         </button>
-        <button class="bio-skip" onclick="HarmonyApp.biometric.skip()" aria-label="כניסה ללא ביומטריה →" data-i18n-aria-label="attr_aria_label.0fa5f9" data-i18n="t.0fa5f9">כניסה ללא ביומטריה →</button>
+        <button class="bio-skip" onclick="HarmonyApp.biometric.skip()" aria-label="כניסה ללא ביומטריה ←" data-i18n-aria-label="attr_aria_label.0fa5f9" data-i18n="t.0fa5f9">כניסה ללא ביומטריה →</button>
     </div>
 
     <div id="profile-overlay">
@@ -3665,7 +3722,7 @@
                         דלג — אפשר להוסיף אח״כ
                     </button>
 
-                    <button class="btn btn-ghost btn-full" onclick="HarmonyApp.profile.goStep(1)" style="min-height:44px;" aria-label="← חזור" data-i18n-aria-label="attr_aria_label.2055d0" data-i18n="t.2055d0">
+                    <button class="btn btn-ghost btn-full" onclick="HarmonyApp.profile.goStep(1)" style="min-height:44px;" aria-label="חזור →" data-i18n-aria-label="attr_aria_label.2055d0" data-i18n="t.2055d0">
                         ← חזור
                     </button>
                 </div>
@@ -3885,9 +3942,9 @@
 
             <!-- TAB 2: EXERCISES -->
             <div id="tab-exercises" class="tab-panel">
-                <div class="exercise-index-wrap open" id="exercise-index-wrap">
+                <div class="exercise-index-wrap" id="exercise-index-wrap">
                     <button class="exercise-index-toggle" onclick="HarmonyApp.ui.toggleExerciseIndex()"
-                            aria-expanded="true" aria-controls="exercise-index" id="exercise-index-toggle" data-i18n="t.37e6ee">
+                            aria-expanded="false" aria-controls="exercise-index" id="exercise-index-toggle" data-i18n="t.37e6ee">
                         🧰 כלים <span class="chev" aria-hidden="true">▾</span>
                     </button>
                     <nav class="exercise-index" id="exercise-index" aria-label="ניווט מהיר בין תרגילים" data-i18n-aria-label="attr_aria_label.656976">
@@ -4231,9 +4288,9 @@
                 <div class="panel">
                     <div class="panel-title" data-i18n="t.bf933b"><svg class="pi" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="5" width="17" height="15.6" rx="2.6"/><path d="M3.5 10.1h17M8 2.9v4.2M16 2.9v4.2"/></svg>ימי תרגול</div>
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-                        <button class="btn btn-ghost btn-compact" onclick="HarmonyApp.ui.changeMonth(-1)" aria-label="← הקודם" data-i18n-aria-label="attr_aria_label.25be3a" data-i18n="t.25be3a">← הקודם</button>
+                        <button class="btn btn-ghost btn-compact" onclick="HarmonyApp.ui.changeMonth(-1)" aria-label="הקודם →" data-i18n-aria-label="attr_aria_label.25be3a" data-i18n="t.25be3a">← הקודם</button>
                         <span id="cal-month-title" class="settings-label"></span>
-                        <button class="btn btn-ghost btn-compact" onclick="HarmonyApp.ui.changeMonth(1)" aria-label="הבא →" data-i18n-aria-label="attr_aria_label.73c90f" data-i18n="t.73c90f">הבא →</button>
+                        <button class="btn btn-ghost btn-compact" onclick="HarmonyApp.ui.changeMonth(1)" aria-label="הבא ←" data-i18n-aria-label="attr_aria_label.73c90f" data-i18n="t.73c90f">הבא →</button>
                     </div>
                     <div class="cal-grid" id="cal-grid"></div>
                 </div>
@@ -4332,7 +4389,7 @@
 
                     <!-- ── 60-second micro practice ── -->
                     <div class="panel" id="card-ex-panel">
-                        <div class="panel-title" style="font-size:var(--fs-md);" data-i18n="t.e263a5"><svg class="pi" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="13.6" r="7.4"/><path d="M12 9.8v3.8l2.5 1.5M9.4 2.6h5.2"/></svg>תרגול של <span id="card-ex-sec">60</span> שניות</div>
+                        <div class="panel-title" style="font-size:var(--fs-md);" data-i18n="t.e263a5"><svg class="pi" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="13.6" r="7.4"/><path d="M12 9.8v3.8l2.5 1.5M9.4 2.6h5.2"/></svg>תרגול של <span id="card-ex-sec">60</span> <span data-i18n="frag.seconds">שניות</span></div>
                         <div class="cotm-ex-head">
                             <span class="cotm-ex-count" id="card-ex-count" aria-hidden="true">60</span>
                             <button class="btn btn-primary btn-compact-square" id="card-ex-btn"
@@ -4373,9 +4430,8 @@
                         <strong data-i18n="t.a08970">כל מה שתעשה יימחק ברגע שתרענן או תסגור.</strong>
                     </div>
                     <div class="panel-sub" style="margin-top:0" data-i18n="t.1965ca">
-                        זה קורה כשפותחים את הקובץ ישירות (כתובת שמתחילה ב-<code>content://</code> או <code>file://</code>),
-                        או בגלישה פרטית. הפתרון: לפתוח את האפליקציה מכתובת <code>https://</code> אמיתית,
-                        או דרך אפליקציית המעטפת — ואז הכל יישמר כרגיל.
+                        זה קורה כשפותחים את הקובץ ישירות (כתובת שמתחילה ב-<code>content://</code> <span data-i18n="frag.or">או</span> <code>file://</code>),
+                        <span data-i18n="frag.storage.mid">או בגלישה פרטית. הפתרון: לפתוח את האפליקציה מכתובת</span> <code>https://</code> <span data-i18n="frag.storage.tail">אמיתית, או דרך אפליקציית המעטפת — ואז הכל יישמר כרגיל.</span>
                     </div>
                     <div class="panel-sub" style="margin-top:0;opacity:0.7" id="storage-driver-line"></div>
                 </div>
@@ -6384,7 +6440,11 @@ ${CONVERSATIONAL_METHODOLOGY}`;
             pairs.forEach(([m, f]) => { this._map[m] = f; });
             const alts = pairs.map(p => p[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
             try {
-                this._rx = new RegExp('(?<![\\u0590-\\u05FF])(' + alts + ')(?![\\u0590-\\u05FF])', 'g');
+                /* The guards exclude "/" as well as Hebrew letters, so a
+                   masculine form that is one half of a written slash pair
+                   ("שים/י") is not inflected on its own — see the note
+                   above the module. */
+                this._rx = new RegExp('(?<![\\u0590-\\u05FF/])(' + alts + ')(?![\\u0590-\\u05FF/])', 'g');
             } catch (e) {
                 // Lookbehind is ES2018. On an engine without it the feature
                 // degrades to masculine text rather than to a broken page.
@@ -6804,11 +6864,21 @@ ${CONVERSATIONAL_METHODOLOGY}`;
         },
 
         restoreExerciseIndex() {
-            let pref = null;
-            try { pref = HarmonyStorage.getRaw(this._EX_INDEX_KEY); } catch(e) {}
-            // Default open: the tools being invisible is the problem this
-            // solves. Only a deliberate close keeps it closed.
-            this.toggleExerciseIndex(pref !== '0');
+            /* The tool index opens CLOSED on every app launch.
+
+               It used to restore whatever the user last chose, on the
+               reasoning that a preference which resets every visit is not a
+               preference. That is a fair argument in general, but it loses
+               here: this panel sits at the very top of the exercises tab and
+               six chips is a wall of choices to meet on arrival. The tab
+               already lists every one of these tools as a full section
+               below, so nothing is unreachable while it is shut — the index
+               is a shortcut, and a shortcut that greets you before you have
+               decided where you are going is just noise.
+
+               Opening it is one tap, and that tap still works normally for
+               the rest of the session. Only the state at launch is fixed. */
+            this.toggleExerciseIndex(false);
         },
 
         /* One source of truth for "is there an AI on the other end". The app
@@ -6884,7 +6954,7 @@ ${CONVERSATIONAL_METHODOLOGY}`;
             // of March no longer light up the 5th of every other month.
             const {year, month} = HarmonyApp.state.calendar;
             const today = new Date();
-            if (title) title.textContent = new Date(year, month, 1).toLocaleDateString('he-IL',{month:'long',year:'numeric'});
+            if (title) title.textContent = new Date(year, month, 1).toLocaleDateString(window.__hIntl(),{month:'long',year:'numeric'});
             const firstDay = new Date(year, month, 1).getDay();
             const totalDays = new Date(year, month+1, 0).getDate();
             grid.innerHTML = '';
@@ -8124,7 +8194,7 @@ ${CONVERSATIONAL_METHODOLOGY}`;
             const d = this.collect();
             const L = [];
             L.push('רוגע — Harmony');
-            L.push('הנתונים שלך, ' + new Date().toLocaleDateString('he-IL'));
+            L.push('הנתונים שלך, ' + new Date().toLocaleDateString(window.__hIntl()));
             L.push('הקובץ נוצר במכשיר שלך ולא נשלח לשום מקום.');
             L.push('='.repeat(46), '');
 
@@ -8286,8 +8356,8 @@ ${CONVERSATIONAL_METHODOLOGY}`;
             ta.value = m.summary;
             if (meta) {
                 const d = new Date(m.updatedAt);
-                meta.textContent = 'עודכן ' + d.toLocaleDateString('he-IL') + ' ' +
-                    d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+                meta.textContent = 'עודכן ' + d.toLocaleDateString(window.__hIntl()) + ' ' +
+                    d.toLocaleTimeString(window.__hIntl(), { hour: '2-digit', minute: '2-digit' });
             }
         },
 
@@ -8869,7 +8939,7 @@ ${CONVERSATIONAL_METHODOLOGY}`;
                 dot.textContent = this._DAY_LETTERS[d.getDay()];
                 dot.setAttribute('aria-label',
                     (isToday ? 'היום, ' : '') +
-                    d.toLocaleDateString('he-IL') +
+                    d.toLocaleDateString(window.__hIntl()) +
                     (done ? ' — הושלם' : ' — לא הושלם'));
                 wrap.appendChild(dot);
             }
@@ -9109,7 +9179,7 @@ ${CONVERSATIONAL_METHODOLOGY}`;
                 const known = [];
                 const unknown = [];
 
-                known.push('השעה כעת ' + now.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })
+                known.push('השעה כעת ' + now.toLocaleTimeString(window.__hIntl(), { hour: '2-digit', minute: '2-digit' })
                     + ' (' + this._partOfDay(now.getHours()) + ').');
 
                 // ── stress: user-reported only ──────────────────────────
@@ -9839,7 +9909,7 @@ ${CONVERSATIONAL_METHODOLOGY}`;
        Four behaviors:
          1. Listening pause  — a deliberate beat before the reply appears.
          2. Tool bridging    — [[tool:x]] markers → real one-tap buttons.
-         3. Pause bubble     — "נשימה אחת..." to break user momentum.
+         3. Pause bubble     — "נשימה אחת…" to break user momentum.
          4. Proactive open   — greet based on measured pulse / stress level.
     ═══════════════════════════════════════════════════════════════════════ */
     HarmonyApp.presence = {
@@ -11245,7 +11315,7 @@ ${CONVERSATIONAL_METHODOLOGY}`;
                         // `text` stays first and unchanged: a server that
                         // ignores the new fields behaves exactly as before.
                         text: spoken,
-                        lang: 'he-IL',
+                        lang: window.__hIntl(),
                         ssml: this._toSSML(chunks, profile),
                         voiceProfile: {
                             companion: therapistIdAt(HarmonyApp.state.chat.therapistIndex),
@@ -11289,10 +11359,17 @@ ${CONVERSATIONAL_METHODOLOGY}`;
             }
 
             const doSpeak = (voices) => {
-                // Best voice priority: he-IL > he > any
-                const heVoice = voices.find(v => v.lang === 'he-IL') ||
-                                voices.find(v => v.lang.startsWith('he')) ||
-                                voices.find(v => v.lang.startsWith('ar')) ||
+                /* Best voice priority: exact tag > same language > a
+                   language-specific last resort. The Arabic fallback below
+                   exists because Arabic voices approximate Hebrew phonetics
+                   acceptably on devices that ship no Hebrew voice — it is
+                   nonsense for English, which is why the fallback chain is
+                   now built from the ACTIVE locale rather than assumed. */
+                const _tag  = window.__hIntl();
+                const _lang = _tag.slice(0, 2);
+                const heVoice = voices.find(v => v.lang === _tag) ||
+                                voices.find(v => v.lang && v.lang.replace('_', '-').startsWith(_lang)) ||
+                                (_lang === 'he' ? voices.find(v => v.lang && v.lang.startsWith('ar')) : null) ||
                                 null;
 
                 const profile = this._voiceProfile();
@@ -11324,7 +11401,7 @@ ${CONVERSATIONAL_METHODOLOGY}`;
                     const chunk = chunks[idx++];
 
                     const utt = new SpeechSynthesisUtterance(chunk.text);
-                    utt.lang   = 'he-IL';
+                    utt.lang   = window.__hIntl();
                     utt.volume = HarmonyApp.state.tts.volume;
                     utt.rate   = profile.rate;
                     utt.pitch  = profile.pitch;
@@ -11463,7 +11540,7 @@ ${CONVERSATIONAL_METHODOLOGY}`;
             if (this._dictating) { try { this._dictating.rec.stop(); } catch(e) {} }
 
             const rec = new SR();
-            rec.lang = 'he-IL'; rec.continuous = false; rec.interimResults = false;
+            rec.lang = window.__hIntl(); rec.continuous = false; rec.interimResults = false;
 
             const done = () => {
                 this._dictating = null;
@@ -11519,7 +11596,7 @@ ${CONVERSATIONAL_METHODOLOGY}`;
             } else {
                 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
                 const rec = new SR();
-                rec.lang = 'he-IL'; rec.continuous = false; rec.interimResults = false;
+                rec.lang = window.__hIntl(); rec.continuous = false; rec.interimResults = false;
                 rec.onresult = e => {
                     const txt = e.results[0][0].transcript;
                     const inp = HarmonyApp.dom['ai-input'];
@@ -11695,7 +11772,7 @@ ${CONVERSATIONAL_METHODOLOGY}`;
                     document.getElementById('hr-health-save').style.display = 'flex';
                     document.getElementById('hr-health-last').textContent = this._last.bpm + ' BPM';
                     document.getElementById('hr-health-meta').textContent =
-                        `אחרון: ${this._last.bpm} · ממוצע 7 ימים: ${avg} · ${new Date(this._last.timestamp).toLocaleString('he-IL')}`;
+                        `אחרון: ${this._last.bpm} · ממוצע 7 ימים: ${avg} · ${new Date(this._last.timestamp).toLocaleString(window.__hIntl())}`;
                 } catch (e) {
                     HarmonyApp.ui.showToast('שגיאה בקריאה ממערכת הבריאות', 'var(--red)');
                     console.warn('[HR] health fetch failed', e);
@@ -12526,7 +12603,7 @@ ${CONVERSATIONAL_METHODOLOGY}`;
                     const item = document.createElement('div');
                     item.className = 'hr-history-item';
                     const date = new Date(entry.timestamp);
-                    const dateStr = date.toLocaleDateString('he-IL', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+                    const dateStr = date.toLocaleDateString(window.__hIntl(), { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
 
                     const bpmDiv = document.createElement('div');
                     bpmDiv.className = 'hr-history-bpm';
@@ -12569,7 +12646,7 @@ ${CONVERSATIONAL_METHODOLOGY}`;
                     const sourceLabels = { camera: 'מצלמה', bluetooth: 'Bluetooth', health: 'מערכת בריאות' };
                     const zoneLabels = { low: 'נמוך', normal: 'תקין', high: 'גבוה' };
                     const hrZone = HarmonyApp.heartRate.history.getHRZone(e.bpm);
-                    return `${d.toLocaleDateString('he-IL')},${d.toLocaleTimeString('he-IL')},${e.bpm},${sourceLabels[e.source]||e.source},${zoneLabels[e.zone]||e.zone},${hrZone.name}`;
+                    return `${d.toLocaleDateString(window.__hIntl())},${d.toLocaleTimeString(window.__hIntl())},${e.bpm},${sourceLabels[e.source]||e.source},${zoneLabels[e.zone]||e.zone},${hrZone.name}`;
                 }).join('\n');
                 const csv = '\uFEFF' + header + rows;
 
@@ -12619,7 +12696,7 @@ ${CONVERSATIONAL_METHODOLOGY}`;
                 // sharing this origin, and it flows into document.write().
                 const rows = entries.map(e => {
                     const d = new Date(e.timestamp);
-                    const when = `${d.toLocaleDateString('he-IL')} ${d.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}`;
+                    const when = `${d.toLocaleDateString(window.__hIntl())} ${d.toLocaleTimeString(window.__hIntl(),{hour:'2-digit',minute:'2-digit'})}`;
                     const bpm = Number(e.bpm) || 0;
                     const source = sourceLabels[e.source] || 'לא ידוע';   // whitelist — no raw value
                     const zone = zoneLabels[e.zone] || '—';
@@ -12634,7 +12711,7 @@ ${CONVERSATIONAL_METHODOLOGY}`;
                     + `table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px 10px;text-align:right;font-size:13px}`
                     + `th{background:#f3f4f6}.d{margin-top:22px;font-size:10px;color:#666;line-height:1.6;border-top:1px solid #eee;padding-top:12px}</style></head>`
                     + `<body><h1>🌳 רוגע Harmony — היסטוריית מדידות דופק</h1>`
-                    + `<div class="sub">הופק בתאריך ${new Date().toLocaleDateString('he-IL')} · ${entries.length} מדידות</div>`
+                    + `<div class="sub">הופק בתאריך ${new Date().toLocaleDateString(window.__hIntl())} · ${entries.length} מדידות</div>`
                     + `<table><thead><tr><th>תאריך ושעה</th><th>מקור</th><th>BPM</th><th>מצב</th></tr></thead><tbody>${rows}</tbody></table>`
                     + `<div class="d">${disclaimer}</div></body></html>`;
                 const w = window.open('', '_blank');
@@ -15070,6 +15147,45 @@ ${COMPACT_SAFETY_NOTE}`;
         else { bootApp(); }
     });
     </script>
+
+    <script id="harmony-global-bridge">
+    /* ══════════════════════════════════════════════════════════════════
+       GLOBAL BRIDGE — makes the core objects reachable as window properties.
+
+       WHY THIS EXISTS. HarmonyApp and HarmonyStorage are declared with
+       `const` at the top level of a classic (non-module) script. That
+       creates a binding in the GLOBAL LEXICAL ENVIRONMENT, which is a
+       different place from the global OBJECT. The practical consequence is
+       the one that matters here:
+
+           typeof HarmonyApp          // "object"  — resolves lexically
+           typeof window.HarmonyApp   // "undefined" — never a property
+
+       Inline onclick handlers and the app itself never noticed, because
+       they resolve names through the scope chain. But every later module
+       in this file gates its startup on the window property:
+
+           if (!window.HarmonyApp || !window.HarmonyStorage)
+               return setTimeout(boot, 120);
+
+       That condition can never become true, so those modules polled every
+       120ms for the entire session and never started. Confirmed in a real
+       browser: the language picker never appeared, the app-bar toggle and
+       Settings selector were never injected, the chosen language was never
+       persisted (S() returned undefined and the write was swallowed by the
+       surrounding try/catch), the AI never received its output-language
+       directive, and the XP/progress layer never seeded either.
+
+       Two assignments fix all of it. Nothing else changes: the lexical
+       bindings stay exactly as they were, so no existing call site is
+       affected, and this is placed immediately after the block that
+       defines them and before the first module that waits on them.
+    ══════════════════════════════════════════════════════════════════ */
+    (function () {
+        try { if (!window.HarmonyApp     && typeof HarmonyApp     !== "undefined") window.HarmonyApp     = HarmonyApp; } catch (e) {}
+        try { if (!window.HarmonyStorage && typeof HarmonyStorage !== "undefined") window.HarmonyStorage = HarmonyStorage; } catch (e) {}
+    })();
+    </script>
     <!-- Service worker registration. Only on http(s): on a file:// build
          this is a silent no-op, so bundled wrappers are unaffected. Once
          served over HTTPS it enables offline use and lets the docked
@@ -16391,7 +16507,7 @@ ${COMPACT_SAFETY_NOTE}`;
             try {
                 var d = new Date(iso + 'T00:00:00');
                 if (isNaN(d)) return esc(iso);
-                return d.toLocaleDateString('he-IL', {
+                return d.toLocaleDateString(window.__hIntl(), {
                     day: 'numeric', month: 'long', year: 'numeric'
                 });
             } catch (e) { return esc(iso); }
@@ -16586,7 +16702,7 @@ ${COMPACT_SAFETY_NOTE}`;
 
         function buildDoc(d) {
             var now = new Date();
-            var stamp = now.toLocaleDateString('he-IL', {
+            var stamp = now.toLocaleDateString(window.__hIntl(), {
                 day: 'numeric', month: 'long', year: 'numeric'
             });
             var name = (d.profile && d.profile.firstName) ? esc(d.profile.firstName) : '';
@@ -18007,6 +18123,22 @@ ${COMPACT_SAFETY_NOTE}`;
                 _DEFAULT:          3
             },
 
+            /* English forms of the level names. They are kept beside the
+               levels themselves so the two lists cannot drift apart: adding
+               a level without an English name is then visibly incomplete
+               here rather than silently Hebrew in the English interface. */
+            LEVEL_NAMES_EN: {
+                'התחלה': 'Beginning',
+                'נשימה': 'Breath',
+                'מודעות': 'Awareness',
+                'רוגע': 'Calm',
+                'איזון': 'Balance',
+                'נוכחות': 'Presence',
+                'בהירות': 'Clarity',
+                'הרמוניה': 'Harmony',
+                'עומק': 'Depth',
+                'שלמות': 'Wholeness'
+            },
             LEVELS: [
                 { min: 0,    name: 'התחלה',  icon: '🌱' },
                 { min: 100,  name: 'נשימה',  icon: '🌬️' },
@@ -18115,6 +18247,21 @@ ${COMPACT_SAFETY_NOTE}`;
         const S  = () => window.HarmonyStorage;
         const A  = () => window.HarmonyApp;
         const now = () => Date.now();
+
+        /* ── level label localisation ────────────────────────────────
+           Read the locale live rather than caching it: these helpers are
+           called during render, and render is exactly what a language
+           switch triggers. */
+        const isEn = () => {
+            try { return window.__hLocale && window.__hLocale() === 'en'; }
+            catch (e) { return false; }
+        };
+        /* The word "level", not a level name. */
+        const lvWord   = () => (isEn() ? 'Level' : 'שלב');
+        const lvUpWord = () => (isEn() ? 'Level up' : 'עלית שלב');
+        /* An unmapped name falls back to the Hebrew rather than to a key or
+           to empty text — a user must never see either. */
+        const lvName = n => (isEn() ? (CONFIG.LEVEL_NAMES_EN[n] || n) : n);
 
         function todayKey(d) {
             d = d || new Date();
@@ -18673,7 +18820,7 @@ ${COMPACT_SAFETY_NOTE}`;
                         '<div class="hp-lv-icon">' + info.icon + '</div>' +
                         '<div class="hp-lv-kicker">עלית שלב</div>' +
                         '<div class="hp-lv-name">' + this._esc(info.name) + '</div>' +
-                        '<div class="hp-lv-num">שלב ' + info.number + '</div>' +
+                        '<div class="hp-lv-num">' + lvWord() + ' ' + info.number + '</div>' +
                         rewardHtml +
                         '<button type="button" class="btn btn-ghost btn-compact hp-lv-btn">המשך</button>' +
                     '</div>';
@@ -18691,7 +18838,7 @@ ${COMPACT_SAFETY_NOTE}`;
                 // Auto-dismiss: the brief asked not to block the app, and a
                 // modal you must dismiss to keep breathing is a block.
                 setTimeout(close, 5200);
-                this._announce('עלית שלב ' + info.number + ' — ' + info.name);
+                this._announce(lvUpWord() + ' ' + info.number + ' — ' + lvName(info.name));
             },
 
             /* ── achievement sheet, queued ──────────────────────────── */
@@ -18760,10 +18907,10 @@ ${COMPACT_SAFETY_NOTE}`;
                     const el = document.getElementById(id);
                     if (el) el.textContent = txt;
                 };
-                set('xp-level-lbl', 'שלב ' + info.number + ' — ' + info.name + ' ' + info.icon);
+                set('xp-level-lbl', lvWord() + ' ' + info.number + ' — ' + lvName(info.name) + ' ' + info.icon);
                 set('xp-points-lbl', info.isMax
-                    ? info.xp.toLocaleString('he-IL') + ' XP'
-                    : info.xp.toLocaleString('he-IL') + ' / ' + info.nextAt.toLocaleString('he-IL') + ' XP');
+                    ? info.xp.toLocaleString(window.__hIntl()) + ' XP'
+                    : info.xp.toLocaleString(window.__hIntl()) + ' / ' + info.nextAt.toLocaleString(window.__hIntl()) + ' XP');
 
                 const bar = document.getElementById('xp-bar-fill');
                 if (bar) {
@@ -18780,7 +18927,7 @@ ${COMPACT_SAFETY_NOTE}`;
                 }
                 set('hp-to-next', info.isMax
                     ? 'הגעת לשלב האחרון ✨'
-                    : info.toNext.toLocaleString('he-IL') + ' XP לשלב הבא');
+                    : info.toNext.toLocaleString(window.__hIntl()) + ' XP לשלב הבא');
 
                 const st = Engine.streak();
                 const sEl = document.getElementById('hp-streak-line');
@@ -18965,7 +19112,7 @@ ${COMPACT_SAFETY_NOTE}`;
                             '<div class="hp-reward-title">' + this._esc(r.title) + '</div>' +
                             '<div class="hp-reward-desc">' + this._esc(r.desc) + '</div>' +
                         '</div>' +
-                        '<div class="hp-reward-lvl">שלב ' + r.level + '</div>' +
+                        '<div class="hp-reward-lvl">' + lvWord() + ' ' + r.level + '</div>' +
                     '</div>').join('');
                 this._sheet('מה נפתח במסע', '', html);
             },
@@ -19518,6 +19665,10 @@ ${COMPACT_SAFETY_NOTE}`;
     <script id="harmony-i18n-catalog">
     window.__harmonyStrings = {
         he: {
+        "frag.seconds": "שניות",
+        "frag.or": "או",
+        "frag.storage.mid": "או בגלישה פרטית. הפתרון: לפתוח את האפליקציה מכתובת",
+        "frag.storage.tail": "אמיתית, או דרך אפליקציית המעטפת — ואז הכל יישמר כרגיל.",
         "attr_aria_label.038325": "עוצמת תדר 528 הרץ",
         "attr_aria_label.044610": "🤯 מוצף",
         "attr_aria_label.0638e6": "שמור את הרגע הזה",
@@ -19533,7 +19684,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "attr_aria_label.0ce4db": "שמור תמונה",
         "attr_aria_label.0ce6be": "🌿 יער",
         "attr_aria_label.0d1940": "שיחה עם מטפל AI",
-        "attr_aria_label.0fa5f9": "כניסה ללא ביומטריה →",
+        "attr_aria_label.0fa5f9": "כניסה ללא ביומטריה ←",
         "attr_aria_label.110656": "🔇 כבוי",
         "attr_aria_label.111670": "הכתב את הרפלקציה בקול",
         "attr_aria_label.11213e": "הודיה שנייה מתוך שלוש",
@@ -19548,9 +19699,9 @@ ${COMPACT_SAFETY_NOTE}`;
         "attr_aria_label.1c338f": "✨ הפעל אפליקציה",
         "attr_aria_label.1c69b3": "הפרופיל שלי — הרחב או קפל",
         "attr_aria_label.1f2057": "שמור שינויים בזיכרון",
-        "attr_aria_label.2055d0": "← חזור",
+        "attr_aria_label.2055d0": "חזור →",
         "attr_aria_label.224150": "מחשבות קשות",
-        "attr_aria_label.25be3a": "← הקודם",
+        "attr_aria_label.25be3a": "הקודם →",
         "attr_aria_label.2692ba": "סגור מסך מלא",
         "attr_aria_label.26e47a": "מחק את הזיכרון",
         "attr_aria_label.27aab8": "שלב 1: המחשבה המטרידה",
@@ -19602,7 +19753,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "attr_aria_label.6c9ea7": "עבור אל שחרור מחשבות",
         "attr_aria_label.703a74": "עצירה ראשונה",
         "attr_aria_label.716b56": "תרגילים",
-        "attr_aria_label.73c90f": "הבא →",
+        "attr_aria_label.73c90f": "הבא ←",
         "attr_aria_label.77a73e": "שליו 🧘",
         "attr_aria_label.790354": "הפעל 🔓",
         "attr_aria_label.7a45fc": "חיפוש מוזיקה חופשי",
@@ -19734,7 +19885,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "t.0ce6be": "🌿 יער",
         "t.0d00ce": "ואיך את/ה יוצא/ת מזה?",
         "t.0e246a": "המסע הפנימי שלך מתחיל כאן",
-        "t.0fa5f9": "כניסה ללא ביומטריה →",
+        "t.0fa5f9": "כניסה ללא ביומטריה ←",
         "t.110656": "🔇 כבוי",
         "t.11ae77": "שאלת התבוננות",
         "t.12ea38": "שלום 🌿",
@@ -19754,7 +19905,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "t.1d4cb5": "🔒 הפעל/י הצפנה בסיסמה",
         "t.1e422f": "פרח ראשון",
         "t.1fe4f2": "↺ מחק",
-        "t.2055d0": "← חזור",
+        "t.2055d0": "חזור →",
         "t.214a3a": "הצעד הראשון",
         "t.215949": ", כדי שנוכל להציג אותו לצידך ברגע קשה. לא נשלח אליו כלום ולא נשתף אותו.",
         "t.216ba9": "מספר נייד ישראלי",
@@ -19762,7 +19913,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "t.224150": "מחשבות קשות",
         "t.240dac": "קבל התראה כשמדידה חורגת מהטווח שהגדרת",
         "t.25576b": "💨 רוח",
-        "t.25be3a": "← הקודם",
+        "t.25be3a": "הקודם →",
         "t.26f5d8": "הקש על הבועה כדי לפוצץ! 💫",
         "t.270fe3": "עדיין אין כאן כלום. זה יתמלא אחרי כמה שיחות.",
         "t.2941ef": "איתן",
@@ -19806,7 +19957,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "t.499c1c": "עקוב עם המבט אחר העיגול כדי לתאם את קצב נשימתך",
         "t.49ba7c": "🌳 התחל במסע שלי",
         "t.4a0ece": "🌊 אוקיינוס",
-        "t.4a80e5": "← חזרה להיסטוריה",
+        "t.4a80e5": "חזרה להיסטוריה →",
         "t.4b3cb5": "מצלמה",
         "t.4c460c": "📷 מצלמה",
         "t.4c9910": "פירוק קוגניטיבי מונחה שלב אחר שלב",
@@ -19854,7 +20005,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "t.7193f5": "מסמך — לקריאה, להדפסה או לשיתוף עם מטפל. טקסט ו‑JSON — לגיבוי ולהעברת נתונים.",
         "t.71d476": "גע בחיישן טביעת האצבע כדי להיכנס",
         "t.723fec": "חיבור למערכת בריאות דורש גרסת אפליקציה ייעודית (לא דפדפן)",
-        "t.73c90f": "הבא →",
+        "t.73c90f": "הבא ←",
         "t.752cef": "📱 מערכת בריאות",
         "t.7640d1": "צייר עם האצבע — בלי מטרה, בלי זמן",
         "t.766dab": "פתח/י 🔓",
@@ -20060,11 +20211,15 @@ ${COMPACT_SAFETY_NOTE}`;
         "t_xp.4cb164": "התקדמות (XP)"
 },
         en: {
+        "frag.seconds": "seconds",
+        "frag.or": "or",
+        "frag.storage.mid": "or in private browsing. The fix: open the app from a real address starting with",
+        "frag.storage.tail": "or through the wrapper app — and then everything is saved as usual.",
         "attr_aria_label.038325": "528 Hz tone volume",
         "attr_aria_label.044610": "🤯 Overwhelmed",
         "attr_aria_label.0638e6": "Keep this moment",
         "attr_aria_label.07aecd": "Delete",
-        "attr_aria_label.07b266": "Minimise player",
+        "attr_aria_label.07b266": "Minimize player",
         "attr_aria_label.085c42": "Ocean volume",
         "attr_aria_label.089b78": "Settings",
         "attr_aria_label.0907ae": "Symmetry 8",
@@ -20125,7 +20280,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "attr_aria_label.50072c": "Volume",
         "attr_aria_label.525cfe": "The last 7 days",
         "attr_aria_label.53536c": "Close music player",
-        "attr_aria_label.54c8b0": "Talk about my colour",
+        "attr_aria_label.54c8b0": "Talk about my color",
         "attr_aria_label.550bf8": "Read AI replies aloud",
         "attr_aria_label.589481": "5 min",
         "attr_aria_label.5904a8": "Symmetry 6",
@@ -20226,7 +20381,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "attr_aria_label.dff4f0": "🔓 Biometric unlock",
         "attr_aria_label.e1bdaf": "😤 Anger",
         "attr_aria_label.e1eda8": "Switch to camera 📷",
-        "attr_aria_label.e760f7": "Overgeneralising 🌀",
+        "attr_aria_label.e760f7": "Overgeneralizing 🌀",
         "attr_aria_label.ea184e": "Export as readable text",
         "attr_aria_label.ea95b1": "Dictate aloud",
         "attr_aria_label.ec48db": "15 min",
@@ -20281,7 +20436,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "t.11ae77": "A question to sit with",
         "t.12ea38": "Hello 🌿",
         "t.13a2d8": "I can't:",
-        "t.142561": "Your daily card — a colour, a reflection and one small creative task",
+        "t.142561": "Your daily card — a color, a reflection and one small creative task",
         "t.14969d": "Please enter a first and last name",
         "t.15f9dc": "✏️ Edit reflection",
         "t.1755dd": "It sounds like you're going through something hard",
@@ -20311,7 +20466,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "t.2b3fb0": "\"Make peace with this moment, and everything changes.\"",
         "t.2b65c5": "First Branch",
         "t.2dbbfd": "🌌 Cosmic womb",
-        "t.2e36b5": "Practise mindfulness, release thoughts and have real conversations with an AI companion — and watch your Soul Tree grow.",
+        "t.2e36b5": "Practice mindfulness, release thoughts and have real conversations with an AI companion — and watch your Soul Tree grow.",
         "t.2f3ef0": "Steering attention to the reality around you, to work with anxiety.",
         "t.2f56d6": "🌿 Saved today",
         "t.2f7d42": "Alerts are estimates only, not a medical diagnosis. If you're concerned, see a doctor.",
@@ -20322,7 +20477,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "t.33162d": "minutes",
         "t.33b360": "Let's begin",
         "t.33e760": "Last name",
-        "t.34d78f": "Rest a finger over the rear camera and flash. The app measures tiny colour changes in your skin with each beat. Keep the pressure light and steady, and stay still.",
+        "t.34d78f": "Rest a finger over the rear camera and flash. The app measures tiny color changes in your skin with each beat. Keep the pressure light and steady, and stay still.",
         "t.351d13": "Panic 🌋",
         "t.3547c4": "⚙️ Heart-rate alert settings",
         "t.36c020": "🧘 Focus",
@@ -20378,7 +20533,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "t.637747": "Full encryption of the journal, conversations and mood — on this device only. Status:",
         "t.6411fb": "All",
         "t.64624e": "Save reading",
-        "t.649af8": "🤖 Talk about my colour",
+        "t.649af8": "🤖 Talk about my color",
         "t.67d0cd": "Off",
         "t.682a6d": "Tired",
         "t.6a0ca7": "Start breathing",
@@ -20492,7 +20647,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "t.c0e2ac": "▶ Start",
         "t.c38726": "Ease, now",
         "t.c62ea6": "· Emergency",
-        "t.c720b5": "You practised on a day you'd said was hard",
+        "t.c720b5": "You practiced on a day you'd said was hard",
         "t.c74ff2": "Acoustic breathing coach",
         "t.c8d581": "🌌 Night",
         "t.ca35f2": "Every breath",
@@ -20519,7 +20674,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "t.ded413": "Continue ➔",
         "t.dff4f0": "🔓 Biometric unlock",
         "t.e10b86": "🌀 Meditative mandala",
-        "t.e1b5c7": "You practised on seven different days — they need not be consecutive",
+        "t.e1b5c7": "You practiced on seven different days — they need not be consecutive",
         "t.e1bdaf": "😤 Anger",
         "t.e1eda8": "Switch to camera 📷",
         "t.e263a5": "A practice of",
@@ -20529,7 +20684,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "t.e6c6c9": "Optional. A number we'll keep",
         "t.e6c939": "Mindfulness and awareness specialist",
         "t.e74609": "One tree in the garden",
-        "t.e760f7": "Overgeneralising 🌀",
+        "t.e760f7": "Overgeneralizing 🌀",
         "t.e7951b": "✨ Imagery",
         "t.e9da3d": "Encrypt journal with a password",
         "t.ea95b1": "Dictate aloud",
@@ -20553,7 +20708,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "t.fbda09": "✨ Create a personal meditation",
         "t.fc4e21": "Session progress",
         "t.fc76b0": "✨ Quick entry, no authentication",
-        "t.fddab8": "Bring attention to the breath, without judgement",
+        "t.fddab8": "Bring attention to the breath, without judgment",
         "t.febabe": "Available",
         "t.ff1ad6": "Cycles",
         "t.ff2009": "Card",
@@ -20856,7 +21011,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "השראה אישית",
         "התבוננות",
         "התוצאה שלך",
-        "התחל →",
+        "התחל ←",
         "התחלה",
         "התחלה חדשה",
         "התחלות גדולות כמעט תמיד נכשלות. ליים הוא הצבע של הצעד שקטן מספיק כדי שתעשה/י אותו היום.",
@@ -20920,7 +21075,6 @@ ${COMPACT_SAFETY_NOTE}`;
         "יהלום",
         "יומן תודה",
         "יומן תודה נשמר! 🌸",
-        "יוני",
         "ימי תרגול ברצף",
         "ימים ברציפות.",
         "ימים. זו החזרה הראשונה מאז.",
@@ -21100,7 +21254,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "נשום/י שלוש נשימות רכות.",
         "נשום/י — וזה הצעד.",
         "נשוף 🍃",
-        "נשימה אחת...",
+        "נשימה אחת…",
         "נשימה אחת…",
         "נשימה ארוכה",
         "נשימה מעוררת",
@@ -21405,9 +21559,9 @@ ${COMPACT_SAFETY_NOTE}`;
         "אני בטוח/ה כרגע": "I'm safe right now",
         "אני זוכר מה שיתפת קודם": "I remember what you shared earlier",
         "אנרגיה": "Energy",
-        "אנרגיה היא לא משהו שמחכים לו — לפעמים היא מגיעה אחרי התנועה, לא לפניה. ענבר הוא הצבע של הניצוץ הקטן שמספיק כדי להתחיל.": "Energy isn't something you wait for — sometimes it arrives after movement, not before it. Amber is the colour of the small spark that's enough to begin.",
-        "אפור כחלחל": "Blue-grey",
-        "אפור כחלחל היום — הצבע של מה שעוד לא ברור. יש משהו כזה אצלך עכשיו?": "Blue-grey today — the colour of what isn't clear yet. Is there something like that for you now?",
+        "אנרגיה היא לא משהו שמחכים לו — לפעמים היא מגיעה אחרי התנועה, לא לפניה. ענבר הוא הצבע של הניצוץ הקטן שמספיק כדי להתחיל.": "Energy isn't something you wait for — sometimes it arrives after movement, not before it. Amber is the color of the small spark that's enough to begin.",
+        "אפור כחלחל": "Blue-gray",
+        "אפור כחלחל היום — הצבע של מה שעוד לא ברור. יש משהו כזה אצלך עכשיו?": "Blue-gray today — the color of what isn't clear yet. Is there something like that for you now?",
         "ארבעה עשר ימים": "Fourteen days",
         "אתמול": "Yesterday",
         "בדוק את המחשבות — CBT מונחה": "Examine the thoughts — guided CBT",
@@ -21422,7 +21576,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "בוקר": "Morning",
         "בוקר טוב 🌿": "Good morning 🌿",
         "בורדו": "Burgundy",
-        "בורדו היום — צבע של עומק. יש רגש שיושב אצלך עמוק לאחרונה?": "Burgundy today — a colour of depth. Is there a feeling sitting deep in you lately?",
+        "בורדו היום — צבע של עומק. יש רגש שיושב אצלך עמוק לאחרונה?": "Burgundy today — a color of depth. Is there a feeling sitting deep in you lately?",
         "בחר \"שמירה כ‑PDF\" בחלון ההדפסה": "Choose \"Save as PDF\" in the print dialog",
         "בחר איך לפנות אליך — בלשון זכר או נקבה": "Choose how we address you — masculine or feminine forms",
         "בחר/י סיסמה. היומן, השיחות ומצב הרוח שלך יוצפנו במכשיר.": "Choose a password. Your journal, conversations and mood will be encrypted on this device.",
@@ -21457,7 +21611,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "דמיון, סמליות ועולם פנימי.": "Imagination, symbolism and an inner world.",
         "דמיין/י אור אינדיגו רגוע ממלא את החדר.": "Imagine a calm indigo light filling the room.",
         "דמיין/י אותו יושב מולך.": "Picture them sitting across from you.",
-        "דמיין/י את המקום הזה — רק את הצבעים שלו.": "Picture that place — just its colours.",
+        "דמיין/י את המקום הזה — רק את הצבעים שלו.": "Picture that place — just its colors.",
         "דמיין/י מים שזורמים סביב אבן — לא דרכה.": "Imagine water flowing around a stone — not through it.",
         "דמיין/י שמה שאת/ה נושא/ת מונח בהן.": "Imagine what you're carrying resting in them.",
         "דפדפן זה אינו תומך בקלט קולי": "This browser doesn't support voice input",
@@ -21465,7 +21619,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "דקות תרגול.": "minutes of practice.",
         "דקות,": "minutes,",
         "האות לא היה ברור מספיק — נסה שוב עם כיסוי טוב יותר": "The signal wasn't clear enough — try again with better coverage",
-        "האימות בוטל. לחץ \"הפעל\" כדי לנסות שוב.": "Authentication was cancelled. Tap \"Enable\" to try again.",
+        "האימות בוטל. לחץ \"הפעל\" כדי לנסות שוב.": "Authentication was canceled. Tap \"Enable\" to try again.",
         "האימות לא הצליח. נסה שוב או לחץ \"כניסה ללא ביומטריה\"": "Authentication failed. Try again, or tap \"Enter without biometrics\"",
         "האם המחשבה מדויקת?": "Is the thought accurate?",
         "הגדל נגן": "Expand player",
@@ -21497,10 +21651,10 @@ ${COMPACT_SAFETY_NOTE}`;
         "הזיכרון עודכן": "Memory updated",
         "הזן/י סיסמה": "Enter a password",
         "החיבור לחיישן Bluetooth התנתק": "The Bluetooth sensor disconnected",
-        "החיישן לא מחובר כרגע. אפשר למדוד עם המצלמה, או פשוט להמשיך.": "The sensor isn't connected. You can measure with the camera, or simply carry on.",
+        "החיישן לא מחובר כרגע. אפשר למדוד עם המצלמה, או פשוט להמשיך.": "The sensor isn't connected. You can measure with the camera, or just keep going.",
         "היה נוכח, והכל ייפול למקומו.": "Be present, and everything falls into place.",
         "היום": "Today",
-        "היום הצבע שלך הוא קורל — רכות. אני סקרן/ית: כמה רך/ה את/ה עם עצמך לאחרונה?": "Your colour today is coral — softness. I'm curious: how gentle have you been with yourself lately?",
+        "היום הצבע שלך הוא קורל — רכות. אני סקרן/ית: כמה רך/ה את/ה עם עצמך לאחרונה?": "Your color today is coral — softness. I'm curious: how gentle have you been with yourself lately?",
         "היום,": "Today,",
         "היזכר/י בדבר קטן אחד מהיום.": "Recall one small thing from today.",
         "היישום": "the app",
@@ -21544,7 +21698,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "הפעל/י הצפנה 🔒": "Enable encryption 🔒",
         "הפעלת נוף קול": "You played a soundscape",
         "הפרופיל נשמר ✓": "Profile saved ✓",
-        "הצבע של היום שלך הוא אינדיגו — שקט ועומק. מה עולה בך כשאת/ה פוגש/ת אותו?": "Your colour today is indigo — quiet and depth. What comes up when you meet it?",
+        "הצבע של היום שלך הוא אינדיגו — שקט ועומק. מה עולה בך כשאת/ה פוגש/ת אותו?": "Your color today is indigo — quiet and depth. What comes up when you meet it?",
         "הצעד הראשון, הקטן מספיק כדי לקרות.": "The first step, small enough to actually happen.",
         "הקובץ נוצר במכשיר שלך ולא נשלח לשום מקום.": "The file is created on your device and sent nowhere.",
         "הקול שמדבר אליך בפנים לא חייב להיות הקשה ביותר שאת/ה מכיר/ה. קורל מזכיר שרכות היא לא ויתור — היא דרך אחרת להחזיק את עצמך.": "The voice that speaks to you inside doesn't have to be the harshest one you know. Coral is a reminder that softness isn't giving up — it's another way of holding yourself.",
@@ -21572,10 +21726,10 @@ ${COMPACT_SAFETY_NOTE}`;
         "השראה אישית": "Personal inspiration",
         "התבוננות": "Reflection",
         "התוצאה שלך": "Your result",
-        "התחל →": "Start →",
+        "התחל ←": "Start →",
         "התחלה": "Beginning",
         "התחלה חדשה": "A fresh start",
-        "התחלות גדולות כמעט תמיד נכשלות. ליים הוא הצבע של הצעד שקטן מספיק כדי שתעשה/י אותו היום.": "Big beginnings almost always fail. Lime is the colour of the step small enough that you'll actually take it today.",
+        "התחלות גדולות כמעט תמיד נכשלות. ליים הוא הצבע של הצעד שקטן מספיק כדי שתעשה/י אותו היום.": "Big beginnings almost always fail. Lime is the color of the step small enough that you'll actually take it today.",
         "התמדה": "Consistency",
         "התמדה, שורשים וצמיחה איטית.": "Persistence, roots and slow growth.",
         "התקדמות השבוע:": "This week's progress:",
@@ -21591,7 +21745,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "זה מה שנאסף כאן עד היום.": "This is what has gathered here so far.",
         "זה נעשה הרגל 🌊": "It's becoming a habit 🌊",
         "זהב": "Gold",
-        "זהב היום — הצבע של הדברים הקטנים. משהו קטן קרה לך היום ששווה לעצור עליו?": "Gold today — the colour of small things. Did something small happen today that's worth pausing on?",
+        "זהב היום — הצבע של הדברים הקטנים. משהו קטן קרה לך היום ששווה לעצור עליו?": "Gold today — the color of small things. Did something small happen today that's worth pausing on?",
         "זהו תקציר שלך משיחות קודמות, לא תמליל. ייתכן שהוא חלקי או לא מדויק,": "This is a summary from earlier conversations, not a transcript. It may be partial or inaccurate,",
         "זוזו במשך 30 שניות בדרך שמרגישה כמו האנרגיה הזו — בלי לחשוב, רק לזוז.": "Move for 30 seconds in a way that feels like this energy — without thinking, just move.",
         "זרימה": "Flow",
@@ -21614,12 +21768,12 @@ ${COMPACT_SAFETY_NOTE}`;
         "חיישן דופק": "Heart-rate sensor",
         "חכם סיני עתיק": "an ancient Chinese sage",
         "חלודה": "Rust",
-        "חלודה היום — צבע של שחרור. יש משהו שאת/ה נושא/ת שכבר לא באמת שלך?": "Rust today — a colour of release. Is there something you're carrying that isn't really yours any more?",
+        "חלודה היום — צבע של שחרור. יש משהו שאת/ה נושא/ת שכבר לא באמת שלך?": "Rust today — a color of release. Is there something you're carrying that isn't really yours any more?",
         "חמישה איזונים": "Five reframes",
         "חמישי": "Thursday",
         "חמישים נשימות": "Fifty breaths",
         "חמלה": "Compassion",
-        "חמלה עצמית ורוך כלפי מי שאת/ה.": "Self-compassion and softness towards who you are.",
+        "חמלה עצמית ורוך כלפי מי שאת/ה.": "Self-compassion and softness toward who you are.",
         "חמש הודיות": "Five gratitudes",
         "חמש שעות": "Five hours",
         "חפש מכשירים": "Scan for devices",
@@ -21635,7 +21789,6 @@ ${COMPACT_SAFETY_NOTE}`;
         "יהלום": "Diamond",
         "יומן תודה": "Gratitude journal",
         "יומן תודה נשמר! 🌸": "Gratitude journal saved 🌸",
-        "יוני": "Lime",
         "ימי תרגול ברצף": "days of practice in a row",
         "ימים ברציפות.": "days in a row.",
         "ימים. זו החזרה הראשונה מאז.": "days. This is the first return since.",
@@ -21650,7 +21803,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "כאן — נסה את מערבל הצלילים המרגיע שלמעלה 🎧": "here — try the calming sound mixer above 🎧",
         "כבר צברת היום מספיק התקדמות 🌿": "You've made enough progress today 🌿",
         "כבר קיים רישום ביומטרי במכשיר זה.": "This device already has a biometric registration.",
-        "כבר תרגל/ה היום.": "Already practised today.",
+        "כבר תרגל/ה היום.": "Already practiced today.",
         "כוכב": "Star",
         "כחול אוקיינוס": "Ocean blue",
         "כחול אוקיינוס היום — רוגע. איך הגוף שלך מרגיש ממש ברגע הזה?": "Ocean blue today — calm. How does your body feel right at this moment?",
@@ -21679,14 +21832,14 @@ ${COMPACT_SAFETY_NOTE}`;
         "כתיבה משחררת": "Freewriting",
         "לא הצלחנו להתחבר למכשיר": "We couldn't connect to the device",
         "לא הצלחתי לאסוף את הנתונים": "I couldn't gather the data",
-        "לא הצלחתי לגשת למצלמה. אפשר להמשיך בלי המדידה — הנשימה עובדת בדיוק אותו דבר 🌿": "I couldn't reach the camera. You can carry on without the reading — the breathing works exactly the same 🌿",
+        "לא הצלחתי לגשת למצלמה. אפשר להמשיך בלי המדידה — הנשימה עובדת בדיוק אותו דבר 🌿": "I couldn't reach the camera. You can keep going without the reading — the breathing works exactly the same 🌿",
         "לא הצלחתי להפיק את המסמך": "I couldn't produce the document",
         "לא הצלחתי להתחבר כרגע — ההודעה שלך נשמרה, אפשר לנסות שוב.": "I couldn't connect just now — your message is saved, you can try again.",
         "לא הצלחתי לשמור כרגע. שווה לפנות קצת מקום במכשיר.": "I couldn't save just now. It's worth freeing up a little space on your device.",
-        "לא חייבים תשובה לכל שאלה כדי להמשיך. אפור כחלחל הוא הרשות להשאיר משהו פתוח בלי שזה ייחשב כישלון.": "You don't need an answer to every question in order to carry on. Blue-grey is permission to leave something open without it counting as failure.",
+        "לא חייבים תשובה לכל שאלה כדי להמשיך. אפור כחלחל הוא הרשות להשאיר משהו פתוח בלי שזה ייחשב כישלון.": "You don't need an answer to every question in order to keep going. Blue-gray is permission to leave something open without it counting as failure.",
         "לא ידוע": "Unknown",
-        "לא כל דבר שאת/ה נושא/ת עדיין שייך לך. חלודה הוא הצבע של מה שנשחק — ושמותר להניח.": "Not everything you carry still belongs to you. Rust is the colour of what has worn through — and what you're allowed to set down.",
-        "לא כל מחשבה דורשת פתרון. לפעמים מספיק לתת לה מקום — לשבת לידה בלי למהר לסדר אותה. אינדיגו הוא הצבע של הרגע שבו מפסיקים לנסות להבין, ופשוט מקשיבים.": "Not every thought needs solving. Sometimes it's enough to give it room — to sit beside it without rushing to tidy it. Indigo is the colour of the moment you stop trying to understand, and simply listen.",
+        "לא כל דבר שאת/ה נושא/ת עדיין שייך לך. חלודה הוא הצבע של מה שנשחק — ושמותר להניח.": "Not everything you carry still belongs to you. Rust is the color of what has worn through — and what you're allowed to set down.",
+        "לא כל מחשבה דורשת פתרון. לפעמים מספיק לתת לה מקום — לשבת לידה בלי למהר לסדר אותה. אינדיגו הוא הצבע של הרגע שבו מפסיקים לנסות להבין, ופשוט מקשיבים.": "Not every thought needs solving. Sometimes it's enough to give it room — to sit beside it without rushing to tidy it. Indigo is the color of the moment you stop trying to understand, and simply listen.",
         "לא ניתן לגשת למצלמה": "Can't access the camera",
         "לא ניתן להפעיל את המיקרופון": "Can't turn on the microphone",
         "לא ניתן להפעיל הצפנה": "Can't enable encryption",
@@ -21700,7 +21853,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "לא נתמך בדפדפן זה": "Not supported in this browser",
         "לא צריך": "Not needed",
         "לא שמעתי כלום — נסה שוב": "I didn't catch that — try again",
-        "לא תרגל/ה כאן": "Hasn't practised here",
+        "לא תרגל/ה כאן": "Hasn't practiced here",
         "לא, השאר": "No, keep it",
         "לא, השאר כמו שזה": "No, leave it as it is",
         "לאפס את כל הנתונים?": "Reset all data?",
@@ -21721,7 +21874,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "לפחות": "at least",
         "לפחות 6 תווים": "At least 6 characters",
         "לפני שתלך — הקדש רגע אחד ליומן התודה. דבר אחד קטן מהיום, במשפט אחד. 🌸": "Before you go — give the gratitude journal one moment. One small thing from today, in one sentence. 🌸",
-        "לפעמים רגש קשה לתאר במילים אבל קל לתאר כמקום, כמזג אוויר או כצבע. סגול פותח את הדלת הזו.": "Some feelings are hard to put in words but easy to describe as a place, a weather or a colour. Purple opens that door.",
+        "לפעמים רגש קשה לתאר במילים אבל קל לתאר כמקום, כמזג אוויר או כצבע. סגול פותח את הדלת הזו.": "Some feelings are hard to put in words but easy to describe as a place, a weather or a color. Purple opens that door.",
         "לתקן": "fix",
         "מאה ימים": "A hundred days",
         "מאה נשימות": "A hundred breaths",
@@ -21753,7 +21906,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "מיינדפולנס הוא תהליך של קבלה עצמית.": "Mindfulness is a process of self-acceptance.",
         "מייצר תובנה...": "Creating an insight…",
         "מכשיר Bluetooth": "Bluetooth device",
-        "ממשיך לתרגל 🌳": "Still practising 🌳",
+        "ממשיך לתרגל 🌳": "Still practicing 🌳",
         "ממשיכים יחד": "Continuing together",
         "מנדלה בסימטריה מלאה": "Full-symmetry mandala",
         "מנדלה ראשונה": "First mandala",
@@ -21772,12 +21925,12 @@ ${COMPACT_SAFETY_NOTE}`;
         "מקצבי נשימה מתקדמים נפתחו בלשונית הנשימה.": "Advanced breathing rhythms are now unlocked in the Breath tab.",
         "מקשיב… הקש לסיום": "Listening… tap to finish",
         "משהו לאחוז בו עכשיו": "Something to hold onto right now",
-        "משהו קטן לא הסתדר. הכל בסדר — אפשר להמשיך 🌿": "Something small didn't work out. It's fine — you can carry on 🌿",
+        "משהו קטן לא הסתדר. הכל בסדר — אפשר להמשיך 🌿": "Something small didn't work out. It's fine — you can keep going 🌿",
         "משתמש Harmony": "Harmony user",
         "מתוך 100).": "out of 100).",
         "מתי לאחרונה הרשית לעצמך להיות רך/ה עם עצמך?": "When did you last let yourself be gentle with yourself?",
         "מתנגן": "Playing",
-        "מתרגל 🌿": "Practising 🌿",
+        "מתרגל 🌿": "Practicing 🌿",
         "נבט 🌱": "Sprout 🌱",
         "נגן": "Play",
         "נגן כאן": "Play here",
@@ -21800,7 +21953,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "נראה שימי": "It seems that days",
         "נראה ש…": "It seems that…",
         "נשום/י החוצה ואמור/אמרי: \"וזה בסדר לעכשיו\".": "Breathe out and say: \"and that's okay for now\".",
-        "נשום/י לכיוון המקום הזה.": "Breathe towards that place.",
+        "נשום/י לכיוון המקום הזה.": "Breathe toward that place.",
         "נשום/י נשימה אחת איטית.": "Take one slow breath.",
         "נשום/י פנימה 4 שניות, החוצה 6.": "Breathe in for 4, out for 6.",
         "נשום/י פנימה ואמור/אמרי בשקט: \"אני לא יודע/ת\".": "Breathe in and say quietly: \"I don't know\".",
@@ -21809,10 +21962,10 @@ ${COMPACT_SAFETY_NOTE}`;
         "נשום/י שלוש נשימות רכות.": "Take three soft breaths.",
         "נשום/י — וזה הצעד.": "Breathe — that's the step.",
         "נשוף 🍃": "Exhale 🍃",
-        "נשימה אחת...": "One breath…",
+        "נשימה אחת…": "One breath…",
         "נשימה אחת…": "One breath…",
         "נשימה ארוכה": "Long breath",
-        "נשימה מעוררת": "Energising breath",
+        "נשימה מעוררת": "Energizing breath",
         "נשימה מרגיעה": "Calming breath",
         "נשימה עמוקה וקצרה שמחזירה אנרגיה": "A short deep breath that brings energy back",
         "נשימה קצרה": "Short breath",
@@ -21823,7 +21976,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "נשר": "Eagle",
         "נתת לעצמך דקה 🌿": "You gave yourself a minute 🌿",
         "סגול": "Purple",
-        "סגול היום — צבע של דמיון. אם הרגע הזה שלך היה נוף, איך הוא היה נראה?": "Purple today — the colour of imagination. If this moment of yours were a landscape, what would it look like?",
+        "סגול היום — צבע של דמיון. אם הרגע הזה שלך היה נוף, איך הוא היה נראה?": "Purple today — the color of imagination. If this moment of yours were a landscape, what would it look like?",
         "סגור את ההודעה": "Close the message",
         "סדר עדיפויות": "Priorities",
         "סובל מחרדה": "experiencing anxiety",
@@ -21838,7 +21991,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "סרוק/י את הגוף מהראש לרגליים ותאר/י מקום אחד שמרגיש רגוע.": "Scan your body from head to feet and describe one place that feels calm.",
         "סשן נשימה": "Breathing session",
         "עברית": "Hebrew",
-        "עדיין לא תרגל/ה היום.": "Hasn't practised yet today.",
+        "עדיין לא תרגל/ה היום.": "Hasn't practiced yet today.",
         "עודכן": "Updated",
         "עומק": "Depth",
         "עומק, שקט והתבוננות פנימית.": "Depth, quiet and inward looking.",
@@ -21853,7 +22006,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "עמוק בשיחה": "Deep in conversation",
         "עמוק בתוך הסשן": "Deep in the session",
         "ענבר": "Amber",
-        "ענבר היום — צבע של ניצוץ. מה בך מרגיש ער יותר ברגע הזה?": "Amber today — the colour of a spark. What in you feels more awake right now?",
+        "ענבר היום — צבע של ניצוץ. מה בך מרגיש ער יותר ברגע הזה?": "Amber today — the color of a spark. What in you feels more awake right now?",
         "עץ בוגר 🌲": "Mature tree 🌲",
         "עץ משגשג 🌸": "Flourishing tree 🌸",
         "עץ צעיר 🌳": "Young tree 🌳",
@@ -21888,7 +22041,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "פריקה": "Release",
         "פרפר": "Butterfly",
         "פתח": "Open",
-        "פתח/י את כפות הידיים כלפי מעלה.": "Turn your palms upwards.",
+        "פתח/י את כפות הידיים כלפי מעלה.": "Turn your palms upward.",
         "צהריים": "Afternoon",
         "צהריים טובים ☀️": "Good afternoon ☀️",
         "צור השראה אישית חדשה": "Create a new personal inspiration",
@@ -21945,7 +22098,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "שגיאה לא צפויה.": "Something unexpected happened.",
         "שהוא": "that he",
         "שהיא": "that she",
-        "שחזר/י אותו בפירוט — צבע, קול, תחושה.": "Rebuild it in detail — colour, sound, sensation.",
+        "שחזר/י אותו בפירוט — צבע, קול, תחושה.": "Rebuild it in detail — color, sound, sensation.",
         "שחרור": "Release",
         "שחרור מחשבות": "Thought release",
         "שחרר/י את הכתפיים כלפי מטה.": "Let your shoulders drop.",
@@ -21995,13 +22148,13 @@ ${COMPACT_SAFETY_NOTE}`;
         "תן לי משפט השראה להיום.": "Give me one line of inspiration for today.",
         "תן לי ציטוט השראה להיום.": "Give me an inspiring quote for today.",
         "תן/י למחשבות לעבור — בלי להיאחז באף אחת מהן.": "Let the thoughts pass — without holding on to any of them.",
-        "תן/י לרגש הזה צבע וצורה — תאר/י אותו כאילו הוא ציור.": "Give this feeling a colour and a shape — describe it as though it were a painting.",
+        "תן/י לרגש הזה צבע וצורה — תאר/י אותו כאילו הוא ציור.": "Give this feeling a color and a shape — describe it as though it were a painting.",
         "תקין": "Normal",
         "תרגול": "Practice",
         "תרגולים": "practices",
         "תרגולים,": "practices,",
-        "תרגלת בשבעה ימים שונים": "You practised on seven different days",
-        "תרגלת בשלושה ימים שונים": "You practised on three different days",
+        "תרגלת בשבעה ימים שונים": "You practiced on seven different days",
+        "תרגלת בשלושה ימים שונים": "You practiced on three different days",
         "— הושלם": "— completed",
         "— הרהורים יומיים —": "— Daily reflections —",
         "— השיחה האחרונה —": "— Last conversation —",
@@ -22011,7 +22164,7 @@ ${COMPACT_SAFETY_NOTE}`;
         "— מה שהמלווה זכר עליך —": "— What your companion remembered about you —",
         "— מוצע עכשיו:": "— suggested now:",
         "— תובנה מ": "— an insight from",
-        "— תודות —": "— Acknowledgements —",
+        "— תודות —": "— Acknowledgments —",
         "↻ נסה שוב": "↻ Try again",
         "⚠️ דופק גבוה (": "⚠️ High heart rate (",
         "⚠️ דופק נמוך (": "⚠️ Low heart rate (",
@@ -22453,6 +22606,11 @@ ${COMPACT_SAFETY_NOTE}`;
                 }
             }
 
+            /* Seeded initial text (see the note above the module). */
+            const inits = root.querySelectorAll('[data-i18n-init]');
+            for (let i = 0; i < inits.length; i++) applyInit(inits[i]);
+            if (root.matches && root.matches('[data-i18n-init]')) applyInit(root);
+
             ATTRS.forEach(attr => {
                 const sel = '[data-i18n-' + attr + ']';
                 const list = root.querySelectorAll(sel);
@@ -22462,6 +22620,33 @@ ${COMPACT_SAFETY_NOTE}`;
                     if (val !== '') el.setAttribute(attr, val);
                 }
             });
+        }
+
+        /* True only while the element still shows one of the values this
+           key can produce — i.e. the app has not replaced it with live
+           state yet. Comparing against every locale's value (not just the
+           current one) is what makes the check survive repeated switching. */
+        function isUntouched(el, key) {
+            const now = (el.textContent || '').trim();
+            if (!now) return true;
+            const cats = window.__harmonyStrings || {};
+            for (const loc in cats) {
+                const v = cats[loc] && cats[loc][key];
+                if (v !== undefined && String(v).trim() === now) return true;
+            }
+            return false;
+        }
+
+        function applyInit(el) {
+            const key = el.getAttribute('data-i18n-init');
+            if (!key || !isUntouched(el, key)) return;
+            const val = t(key);
+            if (val === '') return;
+            for (let j = 0; j < el.childNodes.length; j++) {
+                const n = el.childNodes[j];
+                if (n.nodeType === 3 && n.nodeValue.trim()) { n.nodeValue = val; return; }
+            }
+            el.insertBefore(document.createTextNode(val), el.firstChild);
         }
 
         function applyAll() { applyTo(document.body); }
@@ -22577,6 +22762,13 @@ ${COMPACT_SAFETY_NOTE}`;
             try { A().ui.renderXP(); } catch (e) {}
             try { window.HarmonyProgress.render(); } catch (e) {}
             try { A().dailyCard.render(); } catch (e) {}
+            /* Locale-dependent surfaces that build their own text in JS.
+               Each is isolated: a module that is absent in some build, or
+               throws, must not stop the ones after it from redrawing. */
+            try { A().ui.renderStreakStrip(); } catch (e) {}
+            try { A().achievements.render(); } catch (e) {}
+            try { A().heartRate.renderSummary(); } catch (e) {}
+            try { A().ui.renderTree(); } catch (e) {}
 
             listeners.forEach(fn => { try { fn(code, LANGUAGES[code]); } catch (e) {} });
 
@@ -22595,6 +22787,7 @@ ${COMPACT_SAFETY_NOTE}`;
             if (!force && hasPicked()) return;
             if (document.getElementById('hi18n-picker')) return;
 
+            const lastFocus = document.activeElement;
             const ov = document.createElement('div');
             ov.id = 'hi18n-picker';
             ov.className = 'hi18n-picker';
@@ -22632,6 +22825,45 @@ ${COMPACT_SAFETY_NOTE}`;
                 setLocale(code);
                 ov.classList.remove('open');
                 setTimeout(() => { try { ov.remove(); } catch (e2) {} }, 380);
+            });
+
+            /* ── modal focus management ──────────────────────────────
+               The overlay declares role="dialog" aria-modal="true", which
+               tells a screen reader that everything behind it is out of
+               scope. Without focus containment that promise is false: a
+               keyboard user tabbing through this dialog walks straight out
+               into the ~129 focusable controls of the app underneath, while
+               the screen reader still reports them as unreachable. Escape
+               did nothing either, so a keyboard user who opened the picker
+               from Settings had no way to leave without changing language.
+
+               Contained here rather than with the `inert` attribute, which
+               is unsupported in the older Android WebViews this app is
+               explicitly built to tolerate. */
+            const focusables = () => Array.from(
+                ov.querySelectorAll('button:not([disabled]),[tabindex]:not([tabindex="-1"])'));
+
+            ov.addEventListener('keydown', e => {
+                if (e.key === 'Escape') {
+                    /* A choice is not mandatory: the resolved locale is
+                       already applied and Settings can change it at any
+                       time. Refusing to close would be a keyboard trap. */
+                    e.preventDefault();
+                    try { S().setRaw(PICKED_KEY, '1'); } catch (e2) {}
+                    ov.classList.remove('open');
+                    setTimeout(() => { try { ov.remove(); } catch (e2) {} }, 380);
+                    try { if (lastFocus && lastFocus.focus) lastFocus.focus(); } catch (e2) {}
+                    return;
+                }
+                if (e.key !== 'Tab') return;
+                const f = focusables();
+                if (!f.length) return;
+                const first = f[0], last = f[f.length - 1];
+                if (e.shiftKey && document.activeElement === first) {
+                    e.preventDefault(); last.focus();
+                } else if (!e.shiftKey && document.activeElement === last) {
+                    e.preventDefault(); first.focus();
+                }
             });
 
             setTimeout(() => { try { ov.querySelector('.hi18n-opt').focus(); } catch (e) {} }, 120);
@@ -22893,6 +23125,7 @@ ${COMPACT_SAFETY_NOTE}`;
             return false;
         }
 
+        /* he → en, straight from the catalogue. */
         function map() {
             const I = window.HarmonyI18n;
             const m = window.__harmonyRuntimeStrings;
@@ -22901,12 +23134,61 @@ ${COMPACT_SAFETY_NOTE}`;
             return (loc && loc !== 'he' && m[loc]) ? m[loc] : null;
         }
 
-        function translateTextNode(n, dict) {
+        /* en → he, derived. Built once, lazily, and pruned of anything
+           ambiguous or too short to be safe (see the note above). */
+        let _inverse = null;
+        function inverseMap() {
+            if (_inverse !== null) return _inverse;
+            const m = window.__harmonyRuntimeStrings;
+            if (!m || !m.en) { _inverse = false; return false; }
+            const out = Object.create(null);
+            const seen = Object.create(null);
+            for (const he in m.en) {
+                const en = m.en[he];
+                if (typeof en !== 'string') continue;
+                const k = en.trim();
+                if (k.length < 3 || k === he.trim()) continue;
+                if (seen[k]) { delete out[k]; continue; }   // ambiguous — drop
+                seen[k] = 1;
+                out[k] = he;
+            }
+            _inverse = out;
+            return out;
+        }
+
+        const HEB_RE = /[\u0590-\u05FF]/;
+
+        /* Has this session ever rendered a non-default locale? If not, no
+           English string can be on screen, so the reverse pass has nothing
+           to find and the observer work is pure cost. Hebrew is the default
+           and most sessions never leave it, so this guard is what keeps the
+           reverse capability from taxing the common case. */
+        let everForeign = false;
+
+        /* Which direction, if any, applies right now. */
+        function activeDict() {
+            const I = window.HarmonyI18n;
+            if (!I) return null;
+            if (I.locale !== 'he') {
+                everForeign = true;
+                const d = map();
+                return d ? { dict: d, back: false } : null;
+            }
+            if (!everForeign) return null;
+            const inv = inverseMap();
+            return inv ? { dict: inv, back: true } : null;
+        }
+
+        function translateTextNode(n, mode) {
             const raw = n.nodeValue;
             if (!raw) return;
             const key = raw.trim();
             if (!key || key.length < 2) return;
-            const hit = dict[key];
+            /* Returning to Hebrew: only ever rewrite text that is currently
+               NOT Hebrew. This makes the reverse pass idempotent and means a
+               string that was already correct cannot be disturbed. */
+            if (mode.back && HEB_RE.test(key)) return;
+            const hit = mode.dict[key];
             if (hit === undefined) return;
             // preserve the original surrounding whitespace exactly
             const lead = raw.slice(0, raw.length - raw.trimStart().length);
@@ -22914,10 +23196,10 @@ ${COMPACT_SAFETY_NOTE}`;
             n.nodeValue = lead + hit + trail;
         }
 
-        function walk(root, dict) {
+        function walk(root, mode) {
             if (!root) return;
             if (root.nodeType === 3) {
-                if (!isUserContent(root)) translateTextNode(root, dict);
+                if (!isUserContent(root)) translateTextNode(root, mode);
                 return;
             }
             if (root.nodeType !== 1) return;
@@ -22930,7 +23212,7 @@ ${COMPACT_SAFETY_NOTE}`;
             for (let i = 0; i < batch.length; i++) {
                 const node = batch[i];
                 if (isUserContent(node)) continue;
-                translateTextNode(node, dict);
+                translateTextNode(node, mode);
             }
 
             /* Attributes that surface as visible or announced text. */
@@ -22942,16 +23224,17 @@ ${COMPACT_SAFETY_NOTE}`;
                 ['aria-label', 'placeholder', 'title'].forEach(a => {
                     const v = el.getAttribute(a);
                     if (!v) return;
-                    const hit = dict[v.trim()];
+                    if (mode.back && HEB_RE.test(v)) return;
+                    const hit = mode.dict[v.trim()];
                     if (hit !== undefined) el.setAttribute(a, hit);
                 });
             }
         }
 
         function applyAll() {
-            const dict = map();
-            if (!dict) return;
-            walk(document.body, dict);
+            const mode = activeDict();
+            if (!mode) return;
+            walk(document.body, mode);
         }
 
         /* Observe insertions. Batched through rAF so a burst of DOM writes
@@ -22961,7 +23244,7 @@ ${COMPACT_SAFETY_NOTE}`;
         function watch() {
             if (observer || !window.MutationObserver) return;
             observer = new MutationObserver(muts => {
-                if (!map()) return;
+                if (!activeDict()) return;
                 for (const m of muts) {
                     if (m.type === 'characterData') { queue.push(m.target); continue; }
                     for (const n of m.addedNodes) queue.push(n);
@@ -22969,10 +23252,10 @@ ${COMPACT_SAFETY_NOTE}`;
                 if (queue.length && !pending) {
                     pending = requestAnimationFrame(() => {
                         pending = null;
-                        const dict = map();
+                        const mode = activeDict();
                         const batch = queue; queue = [];
-                        if (!dict) return;
-                        batch.forEach(n => { try { walk(n, dict); } catch (e) {} });
+                        if (!mode) return;
+                        batch.forEach(n => { try { walk(n, mode); } catch (e) {} });
                     });
                 }
             });
@@ -23008,9 +23291,9 @@ ${COMPACT_SAFETY_NOTE}`;
             watch();
             applyAll();
             window.HarmonyI18n.onChange(() => {
-                // On switch back to Hebrew the modules re-render themselves
-                // (setLocale calls their render functions), which restores
-                // the Hebrew source text. Nothing to undo here.
+                /* Both directions now. Four modules re-render themselves on
+                   a switch; everything else on screen is converted in place
+                   by the pass above, in whichever direction applies. */
                 applyAll();
             });
             try {
